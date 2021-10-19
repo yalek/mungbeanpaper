@@ -1,0 +1,839 @@
+---
+title: "fig4"
+author: "chiteri"
+date: "8/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+
+#To run this file. You will need access to the SNP data for genotypic dendogram
+```
+
+```{r}
+#pkgs <- c("factoextra",  "NbClust")
+#install.packages(pkgs)
+library(tidyverse)
+library(factoextra)
+library(NbClust)
+library(circlize)
+library(dendextend)
+library(corrplot)
+```
+
+
+```{r}
+#read data
+#bring in SNP Data (You will need access to SNP data)
+
+#GWAS_GD <- read.table("./data/snp/PI498_nmis0.15_maf.01_GD.txt", header = T)
+#head(GWAS_GD)
+
+blups <- read.csv("./blups/blups_combined.csv")
+
+#filter separate days
+day12 <- blups %>%  filter(Day == 12)
+day15 <- blups %>%  filter(Day == 15)
+day18 <- blups %>%  filter(Day == 18)
+```
+
+#####################################################
+####### working with day 18 ####################
+#######################################################
+
+```{r}
+#GWAS_common <- GWAS_GD #make a copy to work with
+
+#filter major countries #selected bases on populations from Kulbirs paper
+#india(292), Australia(9), philipines(33), South Korea(48), Afhganistan(22), Pakistan(10), Thailand(12), United States(9), United Kingdom (12)
+
+c = c("India", "Australia","Philipines", "South Korea", "Afghanistan", "Pakistan", "Thailand", "United States", "United Kingdom")
+
+day18_2 <- day18
+#unique(day18_2$Country)
+day18_2$Country[!day18_2$Country %in% c ] <- "Others" #rename all other countries others
+#unique(day18_2$Country)
+
+#other countries: Taiwan, Turkey, Kenya, Iran, Iraq, Korea, Russia, Colombia, France, Srilanka, Tajikistan
+#Check their regional climate
+
+#rename the countries to make the dendogram better
+
+day18_2$Country[day18_2$Country == "United States"] <- "US"
+day18_2$Country[day18_2$Country == "United Kingdom"] <- "UK"
+day18_2$Country[day18_2$Country == "South Korea"] <- "SK"
+day18_2$Country[day18_2$Country == "Afghanistan"] <- "Afgh"
+day18_2$Country[day18_2$Country == "Pakistan"] <- "Paki"
+day18_2$Country[day18_2$Country == "Thailand"] <- "Thai"
+day18_2$Country[day18_2$Country == "Australia"] <- "Aus"
+day18_2$Country[day18_2$Country == "Philipines"] <- "Philip"
+day18_2$Country[day18_2$Country == "Others"] <- "Other"
+
+
+#check and remove duplicates PIs
+
+
+day18_2 <- day18_2[!duplicated(day18_2$PI),] #gives you dataframe with no duplicates
+
+#filter 
+#GWAS_common <- GWAS_common %>% filter(PI %in% day18_2$PI)
+
+#grab P1 from country that are in GWAS_GD
+day18_2 <- day18_2 %>% filter(PI %in% GWAS_common$PI)
+
+#add country to snp data
+GWAS_common <- cbind(day18_2$Country,GWAS_common) 
+names(GWAS_common)[1] <- "Country"
+GWAS_common <- GWAS_common %>% relocate(Country, .after = PI) 
+
+```
+
+
+#####Phenotypic cluster Day18#############
+
+```{r}
+#using hclust to determine number of clusters
+#https://www.datanovia.com/en/lessons/agglomerative-hierarchical-clustering/
+
+df_1 <- day18_2 %>% select(PI, Day, Country,TRL,PRL,WID,CVA,LRB,VOL,LRA, SOL2,LED,RHZO,TRL_GR,TRLUpper,NWA,SurfaceArea,DIA,DEP,SDW,RDW,TDW,RSR)
+
+df <- df_1[, 4:ncol(df_1)] #grab the numerical data
+df <- scale(df) #standardize the dataset
+
+
+df.dist <- dist(df) # compute dissimilarity matrix
+df.mat_pheno <- as.matrix(df.dist) #convert it into a matrix
+
+
+```
+
+```{r}
+#try another methods
+##create the hierarchical cluster trees using different methods
+df.hc <- hclust(df.dist, method="ward.D2")
+df.hc2 <- hclust(df.dist, method = "average")
+df.hc3 <- hclust(df.dist, method = "complete")
+df.hc4 <- hclust(df.dist, method = "single")
+df.hc5 <- hclust(df.dist, method = "ward.D")
+df.hc6 <- hclust(df.dist, method = "mcquitty")
+df.hc7 <- hclust(df.dist, method = "median")
+df.hc8 <- hclust(df.dist, method = "centroid")
+
+
+#correlations |correlation. > 0.75 is desired
+cor(df.dist, cophenetic(df.hc))#ward.D2
+cor(df.dist, cophenetic(df.hc2)) #average
+cor(df.dist, cophenetic(df.hc3))#complete
+cor(df.dist, cophenetic(df.hc4))#single
+cor(df.dist, cophenetic(df.hc5))#ward.D
+cor(df.dist, cophenetic(df.hc6))#mcquitty
+cor(df.dist, cophenetic(df.hc7))#median
+cor(df.dist, cophenetic(df.hc8))#centroid
+```
+
+```{r}
+
+#Determining number of clusters to use
+nb <- NbClust(df, distance = "euclidean", min.nc = 2,
+        max.nc = 10, method = "complete")
+
+tiff("./figures/supplementary/day18_pheno_cluster_no.tiff", width = 12, height = 14, units = 'in', res = 120)
+print(fviz_nbclust(nb))
+dev.off() #majority of indices indicated two clusters
+```
+
+
+
+
+```{r}
+dend_Day18_pheno <- as.dendrogram(df.hc3, height = 2 ) %>%   set("labels_cex", 0.4) 
+
+#allows the color_branches to label the branches                                                        
+dend_Day18_pheno <- color_branches(dend_Day18_pheno, k=2, groupLabels = TRUE, col = c("#0072B2", "#D55E00" ))
+
+plot(dend_Day18_pheno, main="Phenotypic Clustering")
+
+```
+
+```{r}
+###bind the data
+
+
+day18_cluster<- (cbind((cutree(df.hc3,k=2)), df_1)) #combine cluster with data
+
+
+#rename cluster name
+colnames(day18_cluster)[1] <- "Pheno.Cluster"
+
+day18_cluster <- day18_cluster %>% relocate(Pheno.Cluster, .after=Country)
+###save this table or all together
+
+#to be saved
+day18_pheno_summary <- day18_cluster %>% group_by(Country,Pheno.Cluster) %>% summarise(n=n())
+
+day18_pheno_summary_1 <- day18_cluster %>% group_by(Day,Pheno.Cluster) %>% summarise(n=n())
+
+##save
+write.csv(day18_pheno_summary, "./figures/fig5_dendogram/day18/Cluster_Summary/day18_pheno_country_summary.csv", row.names = F)
+write.csv(day18_pheno_summary_1, "./figures/fig5_dendogram/day18/Cluster_Summary/day18_pheno_cluster_count.csv", row.names = F)
+```
+
+```{r}
+#############################################################################################################
+##################################   labels modifications and circularized dendogram ################################################
+#############################################################################################################
+
+
+# Change the size of the labels
+dend_Day18_pheno <- set(dend_Day18_pheno, "labels_cex", 0.3)
+
+
+# Change the thickness of the branches
+dend_Day18_pheno <- set(dend_Day18_pheno, "branches_lwd", 2)
+
+###create a column that combines labels: country and PI
+day18_cluster$Pheno_label <- paste0(day18_cluster$Country,"_",day18_cluster$PI)
+
+
+labels(dend_Day18_pheno) <- as.character(day18_cluster[,25])[order.dendrogram(dend_Day18_pheno)] #change the labels of the dendogram
+
+#how many countries
+unique(day18_cluster$Country)
+
+# let's add some color: use country
+colors_to_use <- as.numeric(as.factor(day18_cluster[,3]))
+#colors_to_use
+colors_to_use
+#as.factor(day18_cluster[,3])
+#as.numeric(as.factor(day18_cluster[,3]))
+
+# But sort them based on their order in dend:
+colors_to_use <- colors_to_use[order.dendrogram(dend_Day18_pheno)]
+colors_to_use
+
+# Now we can use them
+labels_colors(dend_Day18_pheno) <- colors_to_use
+
+# Now each state has a color
+labels_colors(dend_Day18_pheno)
+
+##labels by country
+# make figure colored by country of origin
+#Afghanistan - 1 - black- #000000
+#Australia - 2 -  red- 		#CC0066
+#india-3 - green - #8CDB89
+#other - 4 - blue - #3399FF
+#Pakistan - 5 - cyan - #00FFFF
+#Thailand-6 - magenta - #	#FF00FF
+#UK - 7 - orange - 	#FFA500
+#US - 8 - grey - #C0C0C0
+
+
+plot(dend_Day18_pheno, main = "A color for every Country of origin")
+
+
+#Circlize dendrogram - uncomment to see circular dendogram
+# circlize_dendrogram(dend_Day18_pheno,dend_track_height = 0.5)
+# legend("center",
+#      legend = c("Afghanistan" , "Australia" , "India" , "Others" , "Pakistan", "Thailand", "United Kingdom", "United States"),
+#      col = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0"),
+#      fill = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0")
+#      ,y.intersp = 0.8,
+#      bty = "o",  pt.cex = 1.5, cex = 0.8 ,
+#      text.col = "black", horiz = FALSE, inset = c(0, 0.5),
+#      title = "Country of Origin")
+
+
+
+# output dendrogram as TIFF File
+tiff("./figures/fig5_dendogram/day18/Dendo_18_pheno.tiff", width = 7, height = 7, units = 'in', res = 200)
+par(mar=c(0, 0, 0, 0))
+circlize_dendrogram(dend_Day18_pheno,dend_track_height = 0.5, labels = TRUE)#title not included since there is no room
+legend(x = -0.2, y=0.4,
+     legend = c("Cluster 1" , "Cluster 2"),
+     col = c("#FF8C00", "#3399FF"),
+     fill = c("#FF8C00", "#3399FF")
+     ,y.intersp = 0.8,
+     bty = "0",  pt.cex = 1.5, cex = 0.8 ,
+     box.lty = 2, box.lwd = 2,
+     text.col = "black", horiz = FALSE, inset = c(0, 0.5),
+     title = "Phenotypic Clusters")
+
+legend("center",
+     legend = c("Afghanistan" , "Australia" , "India" , "Others" , "Pakistan", "Thailand", "United Kingdom", "United States"),
+     col = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0"),
+     fill = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0")
+     ,y.intersp = 0.8,
+     bty = "o",  pt.cex = 1.5, cex = 0.8 ,
+     text.col = "black", horiz = FALSE, inset = c(0, 0.5),
+     title = "Country of Origin")
+
+dev.off()
+```
+
+############ Genotypic clusters day 18####################
+### You need access to SNP data ###############
+
+```{r}
+#using hclust to determine number of clusters
+#https://www.datanovia.com/en/lessons/agglomerative-hierarchical-clustering/
+
+
+df <- GWAS_common[,3:ncol(GWAS_common)] #grab the numerical data
+
+
+df.dist <- dist(df) # compute dissimilarity matrix
+df.mat_geno <- as.matrix(df.dist) #convert it into a matrix
+
+```
+
+```{r}
+#try another methods
+##create the hierarchical cluster trees using different methods
+df.hc <- hclust(df.dist, method="ward.D2")
+df.hc2 <- hclust(df.dist, method = "average")
+df.hc3 <- hclust(df.dist, method = "complete")
+df.hc4 <- hclust(df.dist, method = "single")
+df.hc5 <- hclust(df.dist, method = "ward.D")
+df.hc6 <- hclust(df.dist, method = "mcquitty")
+df.hc7 <- hclust(df.dist, method = "median")
+df.hc8 <- hclust(df.dist, method = "centroid")
+
+
+#correlations |correlation. > 0.75 is desired
+cor(df.dist, cophenetic(df.hc))#ward.D2
+cor(df.dist, cophenetic(df.hc2)) #average
+cor(df.dist, cophenetic(df.hc3))#complete
+cor(df.dist, cophenetic(df.hc4))#single
+cor(df.dist, cophenetic(df.hc5))#ward.D
+cor(df.dist, cophenetic(df.hc6))#mcquitty
+cor(df.dist, cophenetic(df.hc7))#median
+cor(df.dist, cophenetic(df.hc8))#centroid
+```
+
+```{r}
+#Decided to use complete method since it gave the best correlation coefficient 0.81
+fviz_dend(df.hc3) #create a dendogram
+
+
+```
+
+```{r}
+##finding clusters
+#The above method lets us deduce the no. of clusters from the dendogram
+tiff("./figures/supplementary/day18_geno_cluster_no.tiff", width = 12, height = 14, units = 'in', res = 120)
+fviz_nbclust(df.mat_geno, FUNcluster = hcut, method = "silhouette") #hcut- h clustering
+
+dev.off()
+#2 clusters would be a better representation of the data
+```
+
+```{r}
+dend_Day18_geno <- as.dendrogram(df.hc3, height = 2 ) %>% set("labels_cex", 0.4)
+
+#set("labels_col",k=2) 
+#%>%  set("branches_k_col", k=2) %>%  
+dend_Day18_geno <- color_branches(dend_Day18_geno, k=2, groupLabels = TRUE, col = c("#009E73", "#CC79A7"))
+
+plot(dend_Day18_geno, main="Genotypic Clustering")
+```
+
+```{r}
+###bind the data
+day18_cluster<- (cbind((cutree(df.hc3,k=2)), day18_cluster))
+#rename cluster name
+colnames(day18_cluster)[1] <- "Geno.Cluster"
+day18_cluster <- day18_cluster %>% relocate(Geno.Cluster, .after=Pheno.Cluster)
+###save this table or all together
+
+#to be saved
+day18_geno_summary <- day18_cluster %>% group_by(Country,Geno.Cluster) %>% summarise(n=n())
+day18_geno_summary_1 <- day18_cluster %>% group_by(Day,Geno.Cluster) %>% summarise(n=n())
+
+##save
+write.csv(day18_geno_summary, "./figures/fig4_dendogram/day18/Cluster_Summary/day18_geno_summary.csv", row.names = F)
+write.csv(day18_geno_summary_1, "./figures/fig4_dendogram/day18/Cluster_Summary/day18_geno_count.csv", row.names = F)
+```
+
+
+```{r}
+#############################################################################################################
+##################################   Compare Cluster Methods ################################################
+#############################################################################################################
+
+#    either by specifying the desired number of groups (k) or the cut height(h).
+#   ORDER: 1) By the order of the original data. 2) by the order of the labels in the dendrogram.
+
+# Change the size of the labels
+dend_Day18_geno <- set(dend_Day18_geno, "labels_cex", 0.3)
+
+
+# Change the thickness of the branches
+dend_Day18_geno <- set(dend_Day18_geno, "branches_lwd", 2)
+
+
+day18_cluster$Geno_label <- paste0(day18_cluster$Country,"_",day18_cluster$PI)
+
+
+
+#change labels color with country
+labels(dend_Day18_geno) <- as.character(day18_cluster[,27])[order.dendrogram(dend_Day18_geno)]
+
+
+#how many countries
+#unique(day18_cluster$Country)
+# let's add some color:
+colors_to_use <- as.numeric(as.factor(day18_cluster[,3]))
+#colors_to_use
+# But sort them based on their order in dend:
+colors_to_use <- colors_to_use[order.dendrogram(dend_Day18_geno)]
+#colors_to_use
+
+# Now we can use them
+labels_colors(dend_Day18_geno) <- colors_to_use
+# Now each state has a color
+labels_colors(dend_Day18_geno) 
+plot(dend_Day18_geno, main = "A color for every Country of origin")
+
+
+
+#Circlize dendrogram
+circlize_dendrogram(dend_Day18_geno,dend_track_height = 0.85, groupLabels = TRUE)
+
+
+# output dendrogram as TIFF File
+tiff("./figures/fig4_dendogram/day18/Dendo_18_geno.tiff", width = 7, height = 7, units = 'in', res = 200)
+par(mar=c(0, 0, 0, 0))
+circlize_dendrogram(dend_Day18_geno,dend_track_height = 0.3, labels = TRUE) #title omitted due to space
+
+legend(x = -0.2, y=0.4,
+     legend = c("Cluster 1" , "Cluster 2"),
+     col = c("#009E73", "#CC79A7"),
+     fill = c("#009E73", "#CC79A7")
+     ,y.intersp = 0.8,
+     bty = "0",  pt.cex = 1.5, cex = 0.8,
+     box.lty = 2, box.lwd = 2,
+     text.col = "black", horiz = FALSE, inset = c(0, 0.5),
+     title = "Genotypic Clusters")
+
+legend("center",
+     legend = c("Afghanistan" , "Australia" , "India" , "Others" , "Pakistan", "Thailand", "United Kingdom", "United States"),
+     col = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0"),
+     fill = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0")
+     ,y.intersp = 0.8,
+     bty = "o",  pt.cex = 1.5, cex = 0.8 ,
+     text.col = "black", horiz = FALSE, inset = c(0, 0.5),
+     title = "Country of Origin")
+
+dev.off()
+```
+
+
+######################################OTHER DAYS####################################
+#####################################################
+####### working with day 15 ####################
+#######################################################
+
+##You will need access to SNP  Marker ##########
+
+```{r}
+#GWAS_common <- GWAS_GD #make a copy to work with
+
+#filter major countries #selected bases on populations from Kulbirs paper
+#india(292), Australia(9), philipines(33), South Korea(48), Afhganistan(22), Pakistan(10), Thailand(12), United States(9), United Kingdom (12)
+
+c = c("India", "Australia","Philipines", "South Korea", "Afghanistan", "Pakistan", "Thailand", "United States", "United Kingdom")
+
+day15_2 <- day15
+#unique(day15_2$Country)
+day15_2$Country[!day15_2$Country %in% c ] <- "Others" #rename all other countries others
+#unique(day15_2$Country)
+
+#other countries: Taiwan, Turkey, Kenya, Iran, Iraq, Korea, Russia, Colombia, France, Srilanka, Tajikistan
+#Check their regional climate
+
+#rename the countries to make the dendogram better
+
+day15_2$Country[day15_2$Country == "United States"] <- "US"
+day15_2$Country[day15_2$Country == "United Kingdom"] <- "UK"
+day15_2$Country[day15_2$Country == "South Korea"] <- "SK"
+day15_2$Country[day15_2$Country == "Afghanistan"] <- "Afgh"
+day15_2$Country[day15_2$Country == "Pakistan"] <- "Paki"
+day15_2$Country[day15_2$Country == "Thailand"] <- "Thai"
+day15_2$Country[day15_2$Country == "Australia"] <- "Aus"
+day15_2$Country[day15_2$Country == "Philipines"] <- "Philip"
+day15_2$Country[day15_2$Country == "Others"] <- "Other"
+
+
+#check and remove duplicates PIs
+
+
+day15_2 <- day15_2[!duplicated(day15_2$PI),] #gives you dataframe with no duplicates
+
+#filter 
+#GWAS_common <- GWAS_common %>% filter(PI %in% day15_2$PI)
+
+#grab P1 from country that are in GWAS_GD
+#day15_2 <- day15_2 %>% filter(PI %in% GWAS_common$PI)
+
+#add country to snp data
+#GWAS_common <- cbind(day15_2$Country,GWAS_common) 
+#names(GWAS_common)[1] <- "Country"
+#GWAS_common <- GWAS_common %>% relocate(Country, .after = PI) 
+
+```
+
+
+#####Phenotypic cluster Day15#############
+
+```{r}
+#using hclust to determine number of clusters
+#https://www.datanovia.com/en/lessons/agglomerative-hierarchical-clustering/
+
+df_1 <- day15_2 %>% select(PI, Day, Country,TRL,PRL,WID,CVA,LRB,VOL,LRA, SOL2,LED,RHZO,TRL_GR,TRLUpper,NWA,SurfaceArea,DIA,DEP)
+
+df <- df_1[, 4:ncol(df_1)] #grab the numerical data
+df <- scale(df) #standardize the dataset
+
+
+df.dist <- dist(df) # compute dissimilarity matrix
+df.mat_pheno <- as.matrix(df.dist) #convert it into a matrix
+
+
+```
+
+```{r}
+#try another methods
+##create the hierarchical cluster trees using different methods
+df.hc <- hclust(df.dist, method="ward.D2")
+df.hc2 <- hclust(df.dist, method = "average")
+df.hc3 <- hclust(df.dist, method = "complete")
+df.hc4 <- hclust(df.dist, method = "single")
+df.hc5 <- hclust(df.dist, method = "ward.D")
+df.hc6 <- hclust(df.dist, method = "mcquitty")
+df.hc7 <- hclust(df.dist, method = "median")
+df.hc8 <- hclust(df.dist, method = "centroid")
+
+
+#correlations |correlation. > 0.75 is desired
+cor(df.dist, cophenetic(df.hc))#ward.D2
+cor(df.dist, cophenetic(df.hc2)) #average
+cor(df.dist, cophenetic(df.hc3))#complete
+cor(df.dist, cophenetic(df.hc4))#single
+cor(df.dist, cophenetic(df.hc5))#ward.D
+cor(df.dist, cophenetic(df.hc6))#mcquitty
+cor(df.dist, cophenetic(df.hc7))#median
+cor(df.dist, cophenetic(df.hc8))#centroid
+```
+
+```{r}
+
+#Determining number of clusters to use
+nb <- NbClust(df, distance = "euclidean", min.nc = 2,
+        max.nc = 10, method = "complete")
+
+tiff("./figures/supplementary/day15_pheno_cluster_no.tiff", width = 12, height = 14, units = 'in', res = 120)
+print(fviz_nbclust(nb))
+dev.off() #majority of indices indicated three clusters
+```
+
+
+
+
+```{r}
+dend_Day15_pheno <- as.dendrogram(df.hc3, height = 3 ) %>%   set("labels_cex", 0.4) 
+
+#allows the color_branches to label the branches                                                        
+dend_Day15_pheno <- color_branches(dend_Day15_pheno, k=3, groupLabels = TRUE, col = c("#0072B2","#999999" ,"#D55E00"))
+
+plot(dend_Day15_pheno, main="Phenotypic Clustering")
+
+```
+
+```{r}
+###bind the data
+
+
+day15_cluster<- (cbind((cutree(df.hc3,k=3)), df_1)) #combine cluster with data
+
+
+#rename cluster name
+colnames(day15_cluster)[1] <- "Pheno.Cluster"
+
+day15_cluster <- day15_cluster %>% relocate(Pheno.Cluster, .after=Country)
+###save this table or all together
+
+#to be saved
+day15_pheno_summary <- day15_cluster %>% group_by(Country,Pheno.Cluster) %>% summarise(n=n())
+
+day15_pheno_summary_1 <- day15_cluster %>% group_by(Day,Pheno.Cluster) %>% summarise(n=n())
+
+##save
+write.csv(day15_pheno_summary, "./figures/fig5_dendogram/day15/Cluster_Summary/day15_pheno_country_summary.csv", row.names = F)
+write.csv(day15_pheno_summary_1, "./figures/fig5_dendogram/day15/Cluster_Summary/day15_pheno_cluster_count.csv", row.names = F)
+```
+
+```{r}
+#############################################################################################################
+##################################   labels modifications and circularized dendogram ################################################
+#############################################################################################################
+
+
+# Change the size of the labels
+dend_Day15_pheno <- set(dend_Day15_pheno, "labels_cex", 0.3)
+
+
+# Change the thickness of the branches
+dend_Day15_pheno <- set(dend_Day15_pheno, "branches_lwd", 2)
+
+###create a column that combines labels: country and PI
+day15_cluster$Pheno_label <- paste0(day15_cluster$Country,"_",day15_cluster$PI)
+
+
+labels(dend_Day15_pheno) <- as.character(day15_cluster[,21])[order.dendrogram(dend_Day15_pheno)] #change the labels of the dendogram
+
+#how many countries
+unique(day15_cluster$Country)
+
+# let's add some color: use country
+colors_to_use <- as.numeric(as.factor(day15_cluster[,3]))
+#colors_to_use
+colors_to_use
+#as.factor(day15_cluster[,3])
+#as.numeric(as.factor(day15_cluster[,3]))
+
+# But sort them based on their order in dend:
+colors_to_use <- colors_to_use[order.dendrogram(dend_Day15_pheno)]
+colors_to_use
+
+# Now we can use them
+labels_colors(dend_Day15_pheno) <- colors_to_use
+
+# Now each state has a color
+labels_colors(dend_Day15_pheno)
+
+##labels by country
+# make figure colored by country of origin
+#Afghanistan - 1 - black- #000000
+#Australia - 2 -  red- 		#CC0066
+#india-3 - green - #8CDB89
+#other - 4 - blue - #3399FF
+#Pakistan - 5 - cyan - #00FFFF
+#Thailand-6 - magenta - #	#FF00FF
+#UK - 7 - orange - 	#FFA500
+#US - 8 - grey - #C0C0C0
+
+
+plot(dend_Day15_pheno, main = "A color for every Country of origin")
+
+
+#Circlize dendrogram - uncomment to see circular dendogram
+# circlize_dendrogram(dend_Day15_pheno,dend_track_height = 0.5)
+# legend("center",
+#      legend = c("Afghanistan" , "Australia" , "India" , "Others" , "Pakistan", "Thailand", "United Kingdom", "United States"),
+#      col = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0"),
+#      fill = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0")
+#      ,y.intersp = 0.8,
+#      bty = "o",  pt.cex = 1.5, cex = 0.8 ,
+#      text.col = "black", horiz = FALSE, inset = c(0, 0.5),
+#      title = "Country of Origin")
+
+
+
+# output dendrogram as TIFF File
+tiff("./figures/fig5_dendogram/day15/Dendo_15_pheno.tiff", width = 7, height = 7, units = 'in', res = 200)
+par(mar=c(0, 0, 0, 0))
+circlize_dendrogram(dend_Day15_pheno,dend_track_height = 0.5, labels = TRUE)#title not included since there is no room
+
+legend(x = -0.2, y=0.45,
+     legend = c("Cluster 1" , "Cluster 2", "Cluster 3"),
+     col = c("#0072B2","#999999" ,"#D55E00"),
+     fill = c("#0072B2","#999999" ,"#D55E00")
+     ,y.intersp = 0.8,
+     bty = "0",  pt.cex = 1.5, cex = 0.8 ,
+     box.lty = 2, box.lwd = 2,
+     text.col = "black", horiz = FALSE, inset = c(0, 0.5),
+     title = "Phenotypic Clusters")
+
+legend("center",
+     legend = c("Afghanistan" , "Australia" , "India" , "Others" , "Pakistan", "Thailand", "United Kingdom", "United States"),
+     col = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0"),
+     fill = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0")
+     ,y.intersp = 0.8,
+     bty = "o",  pt.cex = 1.5, cex = 0.8 ,
+     text.col = "black", horiz = FALSE, inset = c(0, 0.5),
+     title = "Country of Origin")
+
+dev.off()
+```
+
+############ Genotypic clusters day 15####################
+#### You will need access to SNP Marker ######
+
+```{r}
+#using hclust to determine number of clusters
+#https://www.datanovia.com/en/lessons/agglomerative-hierarchical-clustering/
+
+
+df <- GWAS_common[,3:ncol(GWAS_common)] #grab the numerical data
+
+
+df.dist <- dist(df) # compute dissimilarity matrix
+df.mat_geno <- as.matrix(df.dist) #convert it into a matrix
+
+```
+
+```{r}
+#try another methods
+##create the hierarchical cluster trees using different methods
+df.hc <- hclust(df.dist, method="ward.D2")
+df.hc2 <- hclust(df.dist, method = "average")
+df.hc3 <- hclust(df.dist, method = "complete")
+df.hc4 <- hclust(df.dist, method = "single")
+df.hc5 <- hclust(df.dist, method = "ward.D")
+df.hc6 <- hclust(df.dist, method = "mcquitty")
+df.hc7 <- hclust(df.dist, method = "median")
+df.hc8 <- hclust(df.dist, method = "centroid")
+
+
+#correlations |correlation. > 0.75 is desired
+cor(df.dist, cophenetic(df.hc))#ward.D2
+cor(df.dist, cophenetic(df.hc2)) #average
+cor(df.dist, cophenetic(df.hc3))#complete
+cor(df.dist, cophenetic(df.hc4))#single
+cor(df.dist, cophenetic(df.hc5))#ward.D
+cor(df.dist, cophenetic(df.hc6))#mcquitty
+cor(df.dist, cophenetic(df.hc7))#median
+cor(df.dist, cophenetic(df.hc8))#centroid
+```
+
+```{r}
+#Decided to use complete method since it gave the best correlation coefficient 0.81
+fviz_dend(df.hc3) #create a dendogram
+
+
+```
+
+```{r}
+##finding clusters
+#The above method lets us deduce the no. of clusters from the dendogram
+tiff("./figures/supplementary/day15_geno_cluster_no.tiff", width = 12, height = 14, units = 'in', res = 120)
+fviz_nbclust(df.mat_geno, FUNcluster = hcut, method = "silhouette") #hcut- h clustering
+
+dev.off()
+#2 clusters would be a better representation of the data
+```
+
+```{r}
+dend_Day15_geno <- as.dendrogram(df.hc3, height = 2 ) %>% set("labels_cex", 0.4)
+
+#set("labels_col",k=2) 
+#%>%  set("branches_k_col", k=2) %>%  
+dend_Day15_geno <- color_branches(dend_Day15_geno, k=2, groupLabels = TRUE, col = c("#009E73", "#CC79A7"))
+
+plot(dend_Day15_geno, main="Genotypic Clustering")
+```
+
+```{r}
+###bind the data
+day15_cluster<- (cbind((cutree(df.hc3,k=2)), day15_cluster))
+#rename cluster name
+colnames(day15_cluster)[1] <- "Geno.Cluster"
+day15_cluster <- day15_cluster %>% relocate(Geno.Cluster, .after=Pheno.Cluster)
+###save this table or all together
+
+#to be saved
+day15_geno_summary <- day15_cluster %>% group_by(Country,Geno.Cluster) %>% summarise(n=n())
+day15_geno_summary_1 <- day15_cluster %>% group_by(Day,Geno.Cluster) %>% summarise(n=n())
+
+##save
+write.csv(day15_geno_summary, "./figures/fig5_dendogram/day15/Cluster_Summary/day15_geno_summary.csv", row.names = F)
+write.csv(day15_geno_summary_1, "./figures/fig5_dendogram/day15/Cluster_Summary/day15_geno_count.csv", row.names = F)
+```
+
+
+```{r}
+#############################################################################################################
+##################################   Compare Cluster Methods ################################################
+#############################################################################################################
+
+#    either by specifying the desired number of groups (k) or the cut height(h).
+#   ORDER: 1) By the order of the original data. 2) by the order of the labels in the dendrogram.
+
+# Change the size of the labels
+dend_Day15_geno <- set(dend_Day15_geno, "labels_cex", 0.3)
+
+
+# Change the thickness of the branches
+dend_Day15_geno <- set(dend_Day15_geno, "branches_lwd", 2)
+
+
+day15_cluster$Geno_label <- paste0(day15_cluster$Country,"_",day15_cluster$PI)
+
+
+
+#change labels color with country
+labels(dend_Day15_geno) <- as.character(day15_cluster[,23])[order.dendrogram(dend_Day15_geno)]
+
+
+#how many countries
+#unique(day15_cluster$Country)
+# let's add some color:
+colors_to_use <- as.numeric(as.factor(day15_cluster[,3]))
+#colors_to_use
+# But sort them based on their order in dend:
+colors_to_use <- colors_to_use[order.dendrogram(dend_Day15_geno)]
+#colors_to_use
+
+# Now we can use them
+labels_colors(dend_Day15_geno) <- colors_to_use
+# Now each state has a color
+labels_colors(dend_Day15_geno) 
+plot(dend_Day15_geno, main = "A color for every Country of origin")
+
+
+
+#Circlize dendrogram
+circlize_dendrogram(dend_Day15_geno,dend_track_height = 0.85, groupLabels = TRUE)
+
+
+# output dendrogram as TIFF File
+tiff("./figures/fig5_dendogram/day15/Dendo_15_geno.tiff", width = 7, height = 7, units = 'in', res = 200)
+par(mar=c(0, 0, 0, 0))
+circlize_dendrogram(dend_Day15_geno,dend_track_height = 0.3, labels = TRUE) #title omitted due to space
+
+legend(x = -0.2, y=0.4,
+     legend = c("Cluster 1" , "Cluster 2"),
+     col = c("#009E73", "#CC79A7"),
+     fill = c("#009E73", "#CC79A7")
+     ,y.intersp = 0.8,
+     bty = "0",  pt.cex = 1.5, cex = 0.8,
+     box.lty = 2, box.lwd = 2,
+     text.col = "black", horiz = FALSE, inset = c(0, 0.5),
+     title = "Genotypic Clusters")
+
+legend("center",
+     legend = c("Afghanistan" , "Australia" , "India" , "Others" , "Pakistan", "Thailand", "United Kingdom", "United States"),
+     col = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0"),
+     fill = c("#000000", "#CC0066" , "#32CD32" , "#3399FF" , "#00FFFF", "#FF00FF","#FFA500","#C0C0C0")
+     ,y.intersp = 0.8,
+     bty = "o",  pt.cex = 1.5, cex = 0.8 ,
+     text.col = "black", horiz = FALSE, inset = c(0, 0.5),
+     title = "Country of Origin")
+
+dev.off()
+```
+
+
+
+######################COMBINE THE BLUPS_CLUSTERS#############
+```{r}
+blups_with_clusters <- bind_rows(day12_cluster, day15_cluster, day18_cluster)
+
+blups_with_clusters <- blups_with_clusters %>% select(-c(Pheno_label, Geno_label))
+
+
+write.csv(blups_with_clusters, "./figures/fig5_dendogram/blups_with_clusters.csv", row.names = F)
+```

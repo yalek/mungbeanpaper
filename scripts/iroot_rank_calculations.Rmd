@@ -1,0 +1,312 @@
+---
+title: "iroot"
+author: "chiteri"
+date: "7/20/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+
+```{r}
+#libraries
+library(tidyverse)
+```
+
+```{r}
+#read data
+blups <- read.csv("./blups/blups_combined.csv")
+
+#filter separate days
+day12 <- blups %>%  filter(Day == 12)  #remove CMM, ImageFlag because they have no variance
+day15 <- blups %>%  filter(Day == 15) 
+day18 <- blups %>%  filter(Day == 18)
+
+```
+
+############################################################################################
+##################################### Day 18 ################################################
+############################################################################################
+
+```{r}
+############################################################################################
+#create a dataframe for ranking of each PI under each trait
+
+#take only the columns with numerical data
+colnum = c(5:(ncol(day18))) # 
+
+day18_ranks <- data.frame(matrix(vector(),223,1, dimnames=list(c(), c("PI")))) #create new dataframe that has 375 rows
+day18_ranks$PI <- (day18$PI) #add column of PI numbers from dataframe
+
+#colnames(day18)
+
+i = 1
+for (i in 1:length(colnum)) {  #this second loop runs through each TRAIT, one at a time
+  x=colnum[i]  #set the current [i] column as x
+  trait=colnames(day18)[x] #sets the current column header as the trait name
+  #Rank <- as.data.frame(rank(desc(day18[x]))) #this was the original code. Needs to be relooked at...why desc. When merging, does it align with original PI/entry???
+  Rank <- as.data.frame(rank(-(day18[x]))) #- means ranking from largest to smallest
+
+    #Rank <- as.data.frame(rank(day18[x]))
+  names(Rank)[1] <- trait  #set current trait as column header
+  day18_ranks <- cbind(day18_ranks,Rank) #add columns to existing dataframe   
+}
+
+```
+## iroot categories according to literature by Falk et al 2020
+## Each category is associated with certain traits
+## will only focus on topsoil foraging and steep, deep and cheap
+
+```{r}
+############################################################################################
+##################################### Scavenger ############################################
+############################################################################################
+
+IdeotypeVar <-  day18_ranks %>%
+                            select(TRLUpper,WID, TRL_GR)
+#select RSA traits to use for particular ideotype
+########################
+
+
+IdeotypeSums <- IdeotypeVar %>%
+                            mutate(SUM = IdeotypeVar %>% rowSums()) #sum the rankings to make a master ranking column
+Meta <- day18_ranks %>%
+                  select(PI) #Create meta df with PI 
+
+Scavenger <- cbind(Meta, IdeotypeSums) #bind meta and ideotype df together
+
+#add country
+country_1 <- day18[,c(1,3)] 
+Scavenger <- merge(country_1, Scavenger, by="PI")
+  
+Scavenger <- arrange(Scavenger,SUM)  %>%
+mutate(ScavengerRanked = rank(SUM, ties.method = "max")) #sort new df based on master ranking column with no.1 being best
+
+
+
+ScavengerTop10 <- as.data.frame(Scavenger[1:10,1:2, drop = FALSE])
+ScavengerBottom10 <- as.data.frame(Scavenger[213:223,1:2, drop = FALSE])
+
+#colnames(ScavengerTop10) <-  "Scavenger"
+```
+
+
+```{r}
+############################################################################################
+################################## Steep, Deep, Cheap#######################################
+############################################################################################
+
+day18_ranks <- mutate(day18_ranks, LRADescending = 224 - LRA)  #invert the ranking for LRAMediangle as a lower angle, not higher angle is desirable
+
+day18_ranks <- mutate(day18_ranks, SOL2 = -SOL2)  #invert the ranking for SOL2 as a lower density, not higher density is desirable
+
+IdeotypeVar <-  day18_ranks %>%
+                            select(LRADescending,PRL,SOL2,TRL_GR) #select RSA traits to use for particular ideotype
+IdeotypeSums <- IdeotypeVar %>%
+                              mutate(SUM = IdeotypeVar %>% rowSums()) #sum the rankings to make a master ranking column
+Meta <- day18_ranks %>%
+                   select(PI) #Create meta df with Entry, PI and Cluster info
+
+SteepDeepCheap <- cbind(Meta, IdeotypeSums) #bind meta and ideotype df together
+
+#add country
+country_1 <- day18[,c(1,3)] 
+SteepDeepCheap <- merge(country_1, SteepDeepCheap, by="PI")
+ 
+SteepDeepCheap <- arrange(SteepDeepCheap, SUM) %>% mutate(DTRanked = rank(SUM, ties.method = "max")) #sort new df based on master ranking column with no.1 being best
+
+SteepDeepCheapTop10 <- as.data.frame(SteepDeepCheap[1:10,1:2, drop = FALSE])
+SteepDeepCheapBottom10 <- as.data.frame(SteepDeepCheap[213:223,1:2, drop = FALSE])
+#colnames(SteepDeepCheapTop10) <-  "SDC"
+```
+
+
+```{r}
+#save
+##top10
+Top10Ideotypes <- cbind(ScavengerTop10,SteepDeepCheapTop10)
+
+colnames(Top10Ideotypes) <- c( "Topsoil foraging","Country", "Steep, Deep, Cheap","Country")
+
+write.csv(Top10Ideotypes,"./tables/ideotypes/Top10Ideotypes_day18.csv", row.names = FALSE)
+
+##top10
+Bottom10Ideotypes <- cbind(ScavengerBottom10,SteepDeepCheapBottom10)
+
+colnames(Bottom10Ideotypes) <- c( "Topsoil foraging","Country", "Steep, Deep, Cheap","Country")
+
+write.csv(Bottom10Ideotypes,"./tables/ideotypes/Bottom10Ideotypes_day18.csv", row.names = FALSE)
+
+
+##join using PI
+
+ST <- Scavenger[,c(1,2,7), drop = FALSE]
+DT <- SteepDeepCheap[,c(1,2,8), drop = FALSE]
+
+AllIdeotypes <- merge(ST, DT) 
+#grab the rankings of  other genotpes
+
+write.csv(Scavenger, "./tables/iroot_ranks/foraging_Day18.csv", row.names = FALSE)
+
+write.csv(SteepDeepCheap, "./tables/iroot_ranks/steepCheapDeap_Day18.csv", row.names = FALSE)
+
+##Note this are how each genotype ranked in descending order. i.e Highest ranked first
+write.csv(AllIdeotypes, "./tables/iroot_ranks/Day18_ideotypes_combined.csv", row.names = FALSE)
+
+```
+
+###############################end of day 18#################################################
+
+
+############################################################################################
+##################################### Day 15 ################################################
+############################################################################################
+
+```{r}
+############################################################################################
+#create a dataframe for ranking of each PI under each trait
+
+#take only the columns with numerical data
+colnum = c(5:(ncol(day15)-4)) # 
+
+day15_ranks <- data.frame(matrix(vector(),235,1, dimnames=list(c(), c("PI")))) #create new dataframe that has 375 rows
+day15_ranks$PI <- (day15$PI) #add column of PI numbers from dataframe
+
+#colnames(day15)
+
+i = 1
+for (i in 1:length(colnum)) {  #this second loop runs through each TRAIT, one at a time
+  x=colnum[i]  #set the current [i] column as x
+  trait=colnames(day15)[x] #sets the current column header as the trait name
+  #Rank <- as.data.frame(rank(desc(day15[x]))) #this was the original code. Needs to be relooked at...why desc. When merging, does it align with original PI/entry???
+  Rank <- as.data.frame(rank(-(day15[x]))) #- means ranking from largest to smallest
+
+    #Rank <- as.data.frame(rank(day15[x]))
+  names(Rank)[1] <- trait  #set current trait as column header
+  day15_ranks <- cbind(day15_ranks,Rank) #add columns to existing dataframe   
+}
+
+```
+## iroot categories according to literature by Falk et al
+## Each category is associated with certain traits
+## will only focus on topsoil foraging and steep, deep and cheap
+
+```{r}
+############################################################################################
+##################################### Scavenger ############################################
+############################################################################################
+
+IdeotypeVar <-  day15_ranks %>%
+                            select(TRLUpper,WID, TRL_GR)
+#select RSA traits to use for particular ideotype
+########################
+
+
+IdeotypeSums <- IdeotypeVar %>%
+                            mutate(SUM = IdeotypeVar %>% rowSums()) #sum the rankings to make a master ranking column
+Meta <- day15_ranks %>%
+                  select(PI) #Create meta df with PI 
+
+Scavenger <- cbind(Meta, IdeotypeSums) #bind meta and ideotype df together
+
+#add country
+country_1 <- day15[,c(1,3)] 
+Scavenger <- merge(country_1, Scavenger, by="PI")
+  
+Scavenger <- arrange(Scavenger,SUM)  %>%
+mutate(ScavengerRanked = rank(SUM, ties.method = "max")) #sort new df based on master ranking column with no.1 being best
+
+
+
+ScavengerTop10 <- as.data.frame(Scavenger[1:10,1:2, drop = FALSE])
+ScavengerBottom10 <- as.data.frame(Scavenger[225:235,1:2, drop = FALSE])
+
+#colnames(ScavengerTop10) <-  "Scavenger"
+```
+
+
+```{r}
+############################################################################################
+################################## Steep, Deep, Cheap#######################################
+############################################################################################
+
+day15_ranks <- mutate(day15_ranks, LRADescending = 236 - LRA)  #invert the ranking for LRAMediangle as a lower angle, not higher angle is desirable
+
+day15_ranks <- mutate(day15_ranks, SOL2 = -SOL2)  #invert the ranking for SOL2 as a lower density, not higher density is desirable
+
+IdeotypeVar <-  day15_ranks %>%
+                            select(LRADescending,PRL,SOL2,TRL_GR) #select RSA traits to use for particular ideotype
+IdeotypeSums <- IdeotypeVar %>%
+                              mutate(SUM = IdeotypeVar %>% rowSums()) #sum the rankings to make a master ranking column
+Meta <- day15_ranks %>%
+                   select(PI) #Create meta df with Entry, PI and Cluster info
+
+SteepDeepCheap <- cbind(Meta, IdeotypeSums) #bind meta and ideotype df together
+
+#add country
+country_1 <- day15[,c(1,3)] 
+SteepDeepCheap <- merge(country_1, SteepDeepCheap, by="PI")
+ 
+SteepDeepCheap <- arrange(SteepDeepCheap, SUM) %>% mutate(DTRanked = rank(SUM, ties.method = "max")) #sort new df based on master ranking column with no.1 being best
+
+SteepDeepCheapTop10 <- as.data.frame(SteepDeepCheap[1:10,1:2, drop = FALSE])
+SteepDeepCheapBottom10 <- as.data.frame(SteepDeepCheap[225:235,1:2, drop = FALSE])
+#colnames(SteepDeepCheapTop10) <-  "SDC"
+```
+
+
+```{r}
+#save
+##top10
+Top10Ideotypes <- cbind(ScavengerTop10,SteepDeepCheapTop10)
+
+colnames(Top10Ideotypes) <- c( "Topsoil foraging","Country", "Steep, Deep, Cheap","Country")
+
+write.csv(Top10Ideotypes,"./tables/ideotypes/Top10Ideotypes_day15.csv", row.names = FALSE)
+
+##top10
+Bottom10Ideotypes <- cbind(ScavengerBottom10,SteepDeepCheapBottom10)
+
+colnames(Bottom10Ideotypes) <- c( "Topsoil foraging","Country", "Steep, Deep, Cheap","Country")
+
+write.csv(Bottom10Ideotypes,"./tables/ideotypes/Bottom10Ideotypes_day15.csv", row.names = FALSE)
+
+
+##join using PI
+
+ST <- Scavenger[,c(1,2,7), drop = FALSE]
+DT <- SteepDeepCheap[,c(1,2,8), drop = FALSE]
+
+AllIdeotypes <- merge(ST, DT) 
+#grab the rankings of  other genotpes
+
+write.csv(Scavenger, "./tables/iroot_ranks/foraging_Day15.csv", row.names = FALSE)
+
+write.csv(SteepDeepCheap, "./tables/iroot_ranks/steepCheapDeap_Day15.csv", row.names = FALSE)
+
+##Note this are how each genotype ranked in descending order. i.e Highest ranked first
+write.csv(AllIdeotypes, "./tables/iroot_ranks/Day15_ideotypes_combined.csv", row.names = FALSE)
+
+```
+
+################################end of day15###############################################
+
+
+
+############################################################################################
+##################################### Day 12  ##############################################
+############################################################################################
+
+
+## iroot categories according to literature by Falk et al 2020
+## Each category is associated with certain traits
+## will only focus on topsoil foraging and steep, deep and cheap
+
+
+###day12 cannot be used to rank scavenger because it does not use TRL_GR
+
+
+
+####################################end of day12 ###########################################

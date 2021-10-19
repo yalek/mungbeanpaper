@@ -1,0 +1,278 @@
+---
+title: "blups"
+author: "chiteri"
+date: "7/14/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+
+##Install packages/fire up libraries
+
+```{r}
+
+library(tidyverse)
+library(lme4)
+library(nlme)
+library(kableExtra)
+library(inti)
+```
+
+```{r}
+#read raw_data with outliers removed
+raw_data <- read.csv("./data/sample_data.csv")
+
+```
+
+
+```{r}
+#make factors, or characters
+
+raw_data$Entry <- as.character(raw_data$Entry)
+raw_data$PI <- as.character(raw_data$PI)
+raw_data$Country <- as.character(raw_data$Country)
+raw_data$Rep <- as.character(raw_data$Rep)
+raw_data$Chamber <- as.character(raw_data$Chamber)
+raw_data$Block<- as.character(raw_data$Block)
+raw_data$SBlock <- as.character(raw_data$SBlock)
+raw_data$Day <- as.character(raw_data$Day)
+raw_data$Time <- as.character(raw_data$Time)
+raw_data$Date <- as.character(raw_data$Date)
+```
+
+#get blups and descriptive statistics
+
+```{r}
+#make copy
+raw_data1  <- raw_data[, -c(17,51,54)] #remove the MED,150 seed(SW) weight, seed_size(Size)
+
+day <- c(12,15,18)
+
+k = 1
+
+for(k in 1:3){ #loop through the days
+    #assign day
+  dy <- day[k]
+  
+    #metadata
+  final_data <- raw_data1 %>% select(Entry, PI, Country)
+  final_data <- final_data[!duplicated(raw_data1$PI),]
+  
+  #add day
+  final_data$Day <- rep(dy, nrow(final_data))
+  
+  #create table for descriptive
+  descriptive_table <- data.frame(character(0), 
+                                numeric(0), 
+                                numeric(0),
+                                numeric(0),
+                                numeric(0),
+                                numeric(0),
+                                numeric(0),
+                                numeric(0),stringsAsFactors=FALSE)
+  #assign column names
+  colnames(descriptive_table) <- c("Trait","Mean","Median","Min","Max","SD","CV","H2.cullis")
+  
+
+  
+  d <- raw_data1 %>%  filter(Day == dy) #filter by day
+  
+  
+  if(d$Day==12 | d$Day==15){
+    d <- d[,colSums(is.na(d)) < nrow(d)] #removes columns which has NAs
+  } 
+  
+  d <- d[!duplicated(d$Plot),] #remove duplicates by plot
+
+  #str(d)
+
+  
+  coln <- c(12:ncol(d)) #Columns you want to check for outliers and remove them
+  
+  y =1
+  
+  for(y in 1:length(coln)){ #loop through the columns
+    z = coln[y]
+    trait <- colnames(d)[z] #extract trait name
+    
+    #model that calculates Blups
+    #set plot_diag=T and save the images for model diagnostics
+    
+    tiff(paste0("./blups/qq_plots/",trait,"_day",dy,".tiff"), width = 15, height = 14, units = 'in', res = 150)
+    
+     hr <- H2cal(data = d
+            , trait = trait
+            , gen.name = "PI"
+            , rep.n = 8
+            , ran.model = "1 + Chamber + (1|Chamber:Block)+ (1|Chamber:Block:SBlock) + (1|PI)"
+            , fix.model = "0 + Chamber + (1|Chamber:Block)+ (1|Chamber:Block:SBlock) + PI"
+
+            , emmeans = FALSE #don't calculate BLUES #if on take s along time
+            , plot_diag = TRUE
+            , outliers.rm = FALSE #remove outliers #using the reml method
+            )
+     dev.off()
+     
+     
+     
+     #extract blups
+     blup <- hr$blups
+     
+     #hr$outliers
+     #hr$model
+
+     #add blups to 
+     final_data <- merge(final_data, blup, by="PI")
+     
+     #variance components
+     tb <- hr$tabsmr
+     
+     #descriptive
+     Mn <- mean(as.numeric(unlist(blup[,2])))#mean
+     Md <- median(as.numeric(unlist(blup[,2])))
+     Min <- min(as.numeric(unlist(blup[,2])))
+     Max <- max(as.numeric(unlist(blup[,2])))
+     Sd <- sd(as.numeric(unlist(blup[,2])))
+     CV <- Sd/Mn
+     H2.cullis <- tb$h2.c
+     
+     #create a vector with variables
+     to_add <- c(trait,Mn,Md,Min,Max, Sd, CV, H2.cullis)
+     #add to the df
+     descriptive_table <- descriptive_table %>% add_row(Trait = trait,
+                                                   Mean = Mn,
+                                                   Median = Md,
+                                                   Min = Min,
+                                                   Max = Max,
+                                                   SD = Sd,
+                                                   CV = CV,
+                                                   H2.cullis = H2.cullis)
+     
+  }
+  
+  #blups table
+ write.csv(final_data, paste0("./blups/","day", dy, "_blups.csv"), row.names = FALSE)
+ 
+  #descriptive
+ descriptive_table[, -1] <- round(descriptive_table[, -1], 2)#apply to whole table
+ 
+ write.csv(descriptive_table, paste0("./blups/","day", dy, "_descriptive.csv"), row.names = FALSE)
+ 
+}
+
+
+```
+
+```{r}
+#combined blups
+day12 <- read.csv("./blups/day12_blups.csv")
+day15 <- read.csv("./blups/day15_blups.csv")
+day18 <- read.csv("./blups/day18_blups.csv")
+
+#combine
+blups <- bind_rows(day12, day15, day18)
+
+write.csv(blups, "./blups/blups_combined.csv", row.names = FALSE)
+```
+
+
+```{r}
+
+###create heritability fig at different days for traits we are interested in
+day12_s <- read.csv("./blups/day12_descriptive.csv")
+day15_s <- read.csv("./blups/day15_descriptive.csv")
+day18_s <- read.csv("./blups/day18_descriptive.csv")
+
+good_traits_12 <- day12_s %>%  filter(Trait %in% c("TRL","PRL","WID","CVA","LRB","VOL","LRA", "SOL2","LED","RHZO","TRL_GR","TRLUpper","NWA","SurfaceArea", "DIA", "DEP")) %>% select(Trait, H2.cullis) %>% arrange(H2.cullis) %>% mutate(day = rep(12))
+
+good_traits_15 <- day15_s %>%  filter(Trait %in% c("TRL","PRL","WID","CVA","LRB","VOL","LRA", "SOL2","LED","RHZO","TRL_GR","TRLUpper","NWA","SurfaceArea", "DIA", "DEP")) %>% select(Trait, H2.cullis) %>% arrange(H2.cullis) %>% mutate(day = rep(15))
+
+good_traits_18 <- day18_s %>%  filter(Trait %in% c("TRL","PRL","WID","CVA","LRB","VOL","LRA", "SOL2","LED","RHZO","TRL_GR","TRLUpper","NWA","SurfaceArea", "DIA", "DEP", "SDW","RDW","TDW","RSR")) %>% select(Trait, H2.cullis) %>% arrange(H2.cullis) %>% mutate(day = rep(18))
+
+good_traits <- bind_rows(good_traits_12, good_traits_15, good_traits_18 )
+
+good_traits$day <- as.factor(good_traits$day)
+
+tiff("./figures/heritability/Heritability_graph1.tiff", width = 15, height = 14, units = 'in', res = 150)
+ggplot(good_traits, mapping=aes(reorder(x=Trait, H2.cullis),y=H2.cullis, fill=day )) + geom_bar(stat = "identity", position = position_dodge(),width = 0.5) + ggtitle("Heritability of desired traits") + ylab("Heritability (n=8)") + xlab("Trait") + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle=90, hjust=1)) + ylim(0,1)
+dev.off()
+
+
+#ggsave("./figures/heritability/Heritability_graph.png")
+
+``` 
+
+```{r}
+##create table 2
+#day12
+
+days_descriptive <- bind_cols(day12_s, day15_s[-37,-1], day18_s[-c(37:41),-1]) #Have to exclude TRL_GR 
+
+#create a vector for TRL_GR 
+TRL <- rep("NA", 7)
+TRL_1 <- append(TRL,"TRL_GR",0) #append TRL_GR
+# TRL_1 <- append(TRL_1, day15_s[37,-1]) #add trl_gr form day15
+# TRL_1 <- append(TRL_1, day18_s[41,-1])#add trl_gr form day18
+
+
+#15
+trl15 <- as.numeric(as.vector(day15_s[37,-1])) #grab values for day15 TRL_GR
+trl18 <- as.numeric(as.vector(day18_s[41,-1])) #grab values for day18 TRL_GR
+#
+datt <- append(TRL_1, trl15) #append TRL_GR for day 15
+datt <- append(datt, trl18)#append TRL_GR for day 18
+
+days_descriptive <- rbind(days_descriptive, datt)
+
+
+###add for SDW, RDW, TDW, RSR
+#shoot dry weight
+weights_1 <- rep("NA", 14)
+weights_1 <- append(weights_1,"SDW",0)
+sdw18 <- as.numeric(as.vector(day18_s[37,-1])) #grab values for day18 SDW
+sdw_18 <- append(weights_1, sdw18)
+days_descriptive <- rbind(days_descriptive, sdw_18)
+
+#Root Dry weight
+weights_1 <- rep("NA", 14)
+weights_1 <- append(weights_1,"RDW",0)
+sdw18 <- as.numeric(as.vector(day18_s[38,-1])) #grab values for day18 SDW
+sdw_18 <- append(weights_1, sdw18)
+days_descriptive <- rbind(days_descriptive, sdw_18)
+
+
+#total Dry weight
+weights_1 <- rep("NA", 14)
+weights_1 <- append(weights_1,"TDW",0)
+sdw18 <- as.numeric(as.vector(day18_s[40,-1])) #grab values for day18 SDW
+sdw_18 <- append(weights_1, sdw18)
+days_descriptive <- rbind(days_descriptive, sdw_18)
+
+#root to shoot ratio - RSR
+weights_1 <- rep("NA", 14)
+weights_1 <- append(weights_1,"RSR",0)
+sdw18 <- as.numeric(as.vector(day18_s[39,-1])) #grab values for day18 SDW
+sdw_18 <- append(weights_1, sdw18)
+days_descriptive <- rbind(days_descriptive, sdw_18)
+
+#days_descriptive[,-1] <- round(days_descriptive[,-1], 2)#round off only numeric columns
+
+write.csv(days_descriptive,"./tables/table2_descriptive.csv", row.names = FALSE)
+ 
+#edit further in excel to show days at the top, 12, 15, 18
+ 
+#filter only relevant traits
+days_descriptive_sign_traits <- days_descriptive %>% filter(Trait %in%   c("TRL","PRL","WID","CVA","LRB","VOL","LRA", "SOL2","LED","RHZO","TRL_GR","TRLUpper","NWA","SurfaceArea", "DIA", "DEP", "SDW","RDW","TDW","RSR"))
+ 
+write.csv(days_descriptive_sign_traits,"./tables/table2_descriptive_significant_traits.csv", row.names = FALSE)
+
+#Edit the table in excel to get table 2
+#The header is in the order of day 12, 15, 18 respectively
+
+```
+
+
+

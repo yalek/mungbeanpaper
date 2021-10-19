@@ -1,0 +1,203 @@
+---
+title: "fig3 pca"
+author: "chiteri"
+date: "7/21/2021"
+output: html_document
+---
+
+##You will need SNP data
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+
+
+```
+
+
+```{r}
+#initiate libraries
+library(stats)
+library(ggplot2)
+library(tidyverse)
+library(colorspace)
+
+```
+
+```{r}
+#read data
+#bring in SNP Data
+GWAS_GD1 <- read.table("./data/snp/PI498_nmis0.15_maf.01_GD.txt", header = T)
+#head(GWAS_GD)
+
+blups <- read.csv("./blups/blups_combined.csv")
+
+
+#filter separate days
+day12 <- blups %>%  filter(Day == 12)
+day15 <- blups %>%  filter(Day == 15)
+day18 <- blups %>%  filter(Day == 18)
+
+```
+
+############day 15 ####################
+
+```{r}
+
+#filter major countries #selected based on populations from Kulbirs paper
+#india(292), Australia(9), philipines(33), South Korea(48), Afhganistan(22), Pakistan(10), Thailand(12), United States(9), United Kingdom (15)
+
+c = c("India", "Australia","Philipines", "South Korea", "Afghanistan", "Pakistan", "Thailand", "United States", "United Kingdom")
+
+day15_2 <- day15
+#unique(day15_2$Country)
+day15_2$Country[!day15_2$Country %in% c ] <- "Others" #rename all other countries others
+#unique(day15_2$Country)
+
+
+#filter snps with PI available
+GWAS_GD <- GWAS_GD1 %>% filter(PI %in% day15_2$PI)
+
+#grap P1 from country that are in GWAS_GD
+day15_2 <- day15_2 %>% filter(PI %in% GWAS_GD$PI)
+
+#add country to snp data
+GWAS_GD <- cbind(day15_2$Country,GWAS_GD) 
+names(GWAS_GD)[1] <- "Country"
+GWAS_GD <- GWAS_GD %>% relocate(Country, .after = PI) 
+
+GD <- GWAS_GD[,3:ncol(GWAS_GD)] #numerical columns
+
+#Convert GD into matrix form 
+geno = as.matrix(GD)
+#geno[1:10,1:10]
+
+```
+
+```{r}
+###############################################################################           
+######################   PCA of Genotypic Information  #########################
+################################################################################       
+
+# PCA with function prcomp
+
+geno1 <- geno[ , which(apply(geno, 2, var) != 0)]#remove columns with zero variance
+pca1 <- prcomp(geno1, scale. = TRUE) #Performs a principal components analysis on the given data matrix and returns the results as an object of class prcomp
+summary(pca1)
+
+# loadings
+pca1_loading =as.data.frame(pca1$x) #the value of the rotated data (the centred data multiplied by the rotation matrix) 
+
+#####################################################################################
+#percent variance explained
+#summary(pca1_loading)
+#####################################################################################
+pca1 <- as.data.frame(pca1$x)
+
+
+##add country info...
+#Bind metadata with PCA data for plotting
+pca1_data <- cbind(GWAS_GD$Country, pca1_loading) 
+colnames(pca1_data)[1] <- "Country"
+
+```
+
+
+```{r}
+# make figure colored by country of origin
+cbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+
+tiff("./figures/fig6_pca/day15_PCA_Country_3a.tiff",compression = "lzw", width = 6, height = 5, units = 'in', res = 500)
+ggplot(pca1_data, aes(x = PC1, y = PC2, color = factor(Country))) +
+  geom_point(alpha=0.99,size=2.5) + 
+  scale_color_manual(values = cbPalette) +
+  labs(x = c(pca1_loading$sdev[1],"PC1 (7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Country")+
+  theme_classic()+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+
+dev.off()
+```
+###### end ##################
+
+############day 18 ####################
+
+```{r}
+
+#filter major countries #selected based on populations from Kulbirs paper
+#india(292), Australia(9), philipines(33), South Korea(48), Afhganistan(22), Pakistan(10), Thailand(12), United States(9), United Kingdom (18)
+
+c = c("India", "Australia","Philipines", "South Korea", "Afghanistan", "Pakistan", "Thailand", "United States", "United Kingdom")
+
+day18_2 <- day18
+#unique(day18_2$Country)
+day18_2$Country[!day18_2$Country %in% c ] <- "Others" #rename all other countries others
+#unique(day18_2$Country)
+
+
+#filter snps with PI available
+GWAS_GD <- GWAS_GD1 %>% filter(PI %in% day18_2$PI)
+
+#grap P1 from country that are in GWAS_GD
+day18_2 <- day18_2 %>% filter(PI %in% GWAS_GD$PI)
+
+#add country to snp data
+GWAS_GD <- cbind(day18_2$Country,GWAS_GD) 
+names(GWAS_GD)[1] <- "Country"
+GWAS_GD <- GWAS_GD %>% relocate(Country, .after = PI) 
+
+GD <- GWAS_GD[,3:ncol(GWAS_GD)] #numerical columns
+
+#Convert GD into matrix form 
+geno = as.matrix(GD)
+#geno[1:10,1:10]
+
+```
+
+```{r}
+###############################################################################           
+######################   PCA of Genotypic Information  #########################
+################################################################################       
+
+# PCA with function prcomp
+
+geno1 <- geno[ , which(apply(geno, 2, var) != 0)]#remove columns with zero variance
+pca1 <- prcomp(geno1, scale. = TRUE) #Performs a principal components analysis on the given data matrix and returns the results as an object of class prcomp
+#summary(pca1)
+
+# loadings
+pca1_loading =as.data.frame(pca1$x) #the value of the rotated data (the centred data multiplied by the rotation matrix) 
+
+#####################################################################################
+#percent variance explained
+#summary(pca1_loading)
+#####################################################################################
+pca1 <- as.data.frame(pca1$x)
+
+
+##add country info...
+#Bind metadata with PCA data for plotting
+pca1_data <- cbind(GWAS_GD$Country, pca1_loading) 
+colnames(pca1_data)[1] <- "Country"
+
+```
+
+
+```{r}
+# make figure colored by country of origin
+cbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+
+tiff("./figures/fig6_pca/day18_PCA_Country_3a.tiff",compression = "lzw", width = 6, height = 5, units = 'in', res = 500)
+ggplot(pca1_data, aes(x = PC1, y = PC2, color = factor(Country))) +
+  geom_point(alpha=0.99,size=2.5) + 
+  scale_color_manual(values = cbPalette) +
+  labs(x = c(pca1_loading$sdev[1],"PC1 (7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Country")+
+  theme_classic()+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+
+dev.off()
+
+```
+
+############ end #####################
+

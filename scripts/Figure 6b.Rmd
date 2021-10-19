@@ -1,0 +1,299 @@
+---
+title: "fig6b"
+author: "chiteri"
+date: "7/21/2021"
+output: html_document
+---
+
+## you will need SNP data for pca
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+
+
+```{r}
+#initiate libraries
+library(stats)
+library(ggplot2)
+library(tidyverse)
+library(colorspace)
+
+```
+
+
+```{r}
+#read data
+#bring in SNP Data
+GWAS_GD1 <- read.table("./data/snp/PI498_nmis0.15_maf.01_GD.txt", header = T)
+#head(GWAS_GD)
+
+blups <- read.csv("./figures/fig5_dendogram/blups_with_clusters.csv")
+
+
+#filter separate days
+day12 <- blups %>%  filter(Day == 12)
+day15 <- blups %>%  filter(Day == 15)
+day18 <- blups %>%  filter(Day == 18)
+```
+
+###########day18###########
+```{r}
+#filter snps with PI available
+GWAS_GD <- GWAS_GD1 %>% filter(PI %in% day18$PI)
+
+#grab P1 from country that are in GWAS_GD
+day15 <- day15 %>% filter(PI %in% GWAS_GD$PI)
+
+#add genotypic cluster to snp data
+GWAS_GD <- cbind(day15$Geno.Cluster,GWAS_GD) 
+names(GWAS_GD)[1] <- "Geno.Cluster"
+GWAS_GD <- GWAS_GD %>% relocate(Geno.Cluster, .after = PI) 
+
+GD <- GWAS_GD[,3:ncol(GWAS_GD)]
+
+#Convert GD into matrix form 
+geno = as.matrix(GD)
+#geno[1:10,1:10]
+```
+
+```{r}
+################################################################################           
+######################   PCA of Genotypic Information  #########################
+################################################################################       
+
+# PCA with function prcomp
+geno1 <- geno[ , which(apply(geno, 2, var) != 0)]#remove columns with zero variance
+
+#pca1 = prcomp(GD[,2:ncol(GD)], scale. = TRUE)
+pca1 <- prcomp(geno1, scale. = TRUE) #Performs a principal components analysis on the given data matrix and returns the results as an object of class prcomp
+
+# loadings
+pca1_loading =as.data.frame(pca1$x) #the value of the rotated data (the centred data multiplied by the rotation matrix) 
+
+#####################################################################################
+#percent variance explained
+#summary(pca1)
+#####################################################################################
+pca1 <- as.data.frame(pca1$x)
+
+#Bind metadata with PCA data for plotting
+pca1_data <- cbind(GWAS_GD[,c(1,2)], pca1_loading[1:2])
+#pca1_loading[1:10,1:10]
+
+#str(pca1_loading)
+
+###Don't use country as clustering...use the genotypic clusters
+
+tiff("./figures/fig6_pca/day18_PCA_3c_genotype_cluster.tiff",compression = "lzw", width = 6, height = 5, units = 'in', res = 500)
+ggplot(pca1_data, aes(x = PC1, y = PC2, color = as.factor(Geno.Cluster))) +
+  geom_point(alpha=0.99,size=2) +
+  stat_ellipse(type = "norm", level = 0.90, linetype = 1, lwd = 1)+
+  labs(x = c(pca1_loading$sdev[1],"PC1 7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"))+
+  labs(color=expression(atop('Genotypic', 'Cluster'))) +
+  theme_classic()+
+  scale_color_manual(values=c("#E69F00","#0072B2")) +
+  theme(axis.text=element_text(size=12),axis.title=element_text(size=14,face="bold"))
+dev.off()
+
+```
+########end 18##############
+
+
+################day 15 ##########
+```{r}
+#filter snps with PI available
+GWAS_GD <- GWAS_GD1 %>% filter(PI %in% day15$PI)
+
+#grab P1 from country that are in GWAS_GD
+day15 <- day15 %>% filter(PI %in% GWAS_GD$PI)
+
+#add genotypic cluster to snp data
+GWAS_GD <- cbind(day15$Geno.Cluster,GWAS_GD) 
+names(GWAS_GD)[1] <- "Geno.Cluster"
+GWAS_GD <- GWAS_GD %>% relocate(Geno.Cluster, .after = PI) 
+
+GD <- GWAS_GD[,3:ncol(GWAS_GD)]
+
+#Convert GD into matrix form 
+geno = as.matrix(GD)
+#geno[1:10,1:10]
+```
+
+```{r}
+################################################################################           
+######################   PCA of Genotypic Information  #########################
+################################################################################       
+
+# PCA with function prcomp
+geno1 <- geno[ , which(apply(geno, 2, var) != 0)]#remove columns with zero variance
+
+#pca1 = prcomp(GD[,2:ncol(GD)], scale. = TRUE)
+pca1 <- prcomp(geno1, scale. = TRUE) #Performs a principal components analysis on the given data matrix and returns the results as an object of class prcomp
+
+# loadings
+pca1_loading =as.data.frame(pca1$x) #the value of the rotated data (the centred data multiplied by the rotation matrix) 
+
+#####################################################################################
+#percent variance explained
+#summary(pca1)
+#####################################################################################
+pca1 <- as.data.frame(pca1$x)
+
+#Bind metadata with PCA data for plotting
+pca1_data <- cbind(GWAS_GD[,c(1,2)], pca1_loading[1:2])
+#pca1_loading[1:10,1:10]
+
+#str(pca1_loading)
+
+###Don't use country as clustering...use the genotypic clusters
+
+tiff("./figures/fig6_pca/day15_PCA_3c_genotype_cluster.tiff",compression = "lzw", width = 6, height = 5, units = 'in', res = 500)
+ggplot(pca1_data, aes(x = PC1, y = PC2, color = as.factor(Geno.Cluster))) +
+  geom_point(alpha=0.99,size=2) +
+  stat_ellipse(type = "norm", level = 0.90, linetype = 1, lwd = 1)+
+  labs(x = c(pca1_loading$sdev[1],"PC1 7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"))+
+  labs(color=expression(atop('Genotypic', 'Cluster'))) +
+  theme_classic()+
+  scale_color_manual(values=c("#E69F00","#0072B2")) +
+  theme(axis.text=element_text(size=12),axis.title=element_text(size=14,face="bold"))
+dev.off()
+
+```
+
+##day 15 table4
+```{r}
+####Table 4 #####
+
+
+day15_1 <- day15[, ] #remove the labels
+
+#Grouping by Phenotypic cluster and country
+by_country_pheno <- day15_1 %>% group_by(Country, Pheno.Cluster) %>% summarise(n())
+names(by_country_pheno)[3] <- "Total" #rename n()
+
+by_country_pheno <- by_country_pheno %>% pivot_wider(names_from = Pheno.Cluster, values_from = Total)
+
+by_country_pheno[is.na(by_country_pheno)]=0 #replace NAs with o's
+
+
+#Grouping by Genotypic cluster and country
+by_country_geno <- day15_1 %>% group_by(Country, Geno.Cluster) %>% summarise(n())
+names(by_country_geno)[3] <- "Total" #rename n()
+
+by_country_geno <- by_country_geno %>% pivot_wider(names_from = Geno.Cluster, values_from = Total)
+
+by_country_geno[is.na(by_country_geno)]=0 #replace NAs with o's
+
+
+#Grouping by Phenotypic cluster and traits
+#pivot to longer first
+by_trait_pheno <- day15_1 %>% pivot_longer(cols = c(6:21), names_to = "Trait")
+
+#group
+by_trait_pheno <- by_trait_pheno %>% group_by(Trait, Pheno.Cluster) %>% summarise(Mean=mean(value)) #find means
+
+#pivot_wider
+by_trait_pheno <- by_trait_pheno %>% pivot_wider(names_from = Pheno.Cluster, values_from = Mean)
+
+by_trait_pheno[,-1] <- round(by_trait_pheno[,-1], 2) #round off to 2 decimal places
+
+#Grouping by Genotypic cluster and traits
+#pivot to longer first
+by_trait_geno <- day15_1 %>% pivot_longer(cols = c(6:21), names_to = "Trait")
+
+#group
+by_trait_geno <- by_trait_geno %>% group_by(Trait, Geno.Cluster) %>% summarise(Mean=mean(value)) #find means
+
+#pivot_wider
+by_trait_geno <- by_trait_geno %>% pivot_wider(names_from = Geno.Cluster, values_from = Mean)
+
+by_trait_geno[,-1] <- round(by_trait_geno[,-1], 2) #round off to 2 decimal places
+
+#find sums
+
+
+#Combine the datasets 
+#country
+by_country <- bind_cols(by_country_pheno, by_country_geno[,2:3])
+names(by_country) <- c("Grouping", "1", "2","3","4","5")
+
+by_trait <- bind_cols(by_trait_pheno,by_trait_geno[,2:3] )
+names(by_trait) <- c("Grouping", "1", "2","3", "4","5")
+
+
+#bind
+table4 <- bind_rows(by_country, by_trait)
+
+write.csv(table4, "./tables/table4_day15_summaries_by_clusters.csv", row.names = F)
+##edit the file in excel
+```
+
+##table4 day 18
+
+```{r}
+####Table 4 #####
+
+
+day18_1 <- day18[, ] #remove the labels
+
+#Grouping by Phenotypic cluster and country
+by_country_pheno <- day18_1 %>% group_by(Country, Pheno.Cluster) %>% summarise(n())
+names(by_country_pheno)[3] <- "Total" #rename n()
+
+by_country_pheno <- by_country_pheno %>% pivot_wider(names_from = Pheno.Cluster, values_from = Total)
+
+by_country_pheno[is.na(by_country_pheno)]=0 #replace NAs with o's
+
+
+#Grouping by Genotypic cluster and country
+by_country_geno <- day18_1 %>% group_by(Country, Geno.Cluster) %>% summarise(n())
+names(by_country_geno)[3] <- "Total" #rename n()
+
+by_country_geno <- by_country_geno %>% pivot_wider(names_from = Geno.Cluster, values_from = Total)
+
+by_country_geno[is.na(by_country_geno)]=0 #replace NAs with o's
+
+
+#Grouping by Phenotypic cluster and traits
+#pivot to longer first
+by_trait_pheno <- day18_1 %>% pivot_longer(cols = c(6:25), names_to = "Trait")
+
+#group
+by_trait_pheno <- by_trait_pheno %>% group_by(Trait, Pheno.Cluster) %>% summarise(Mean=mean(value)) #find means
+
+#pivot_wider
+by_trait_pheno <- by_trait_pheno %>% pivot_wider(names_from = Pheno.Cluster, values_from = Mean)
+
+by_trait_pheno[,-1] <- round(by_trait_pheno[,-1], 2) #round off to 2 decimal places
+
+#Grouping by Genotypic cluster and traits
+#pivot to longer first
+by_trait_geno <- day18_1 %>% pivot_longer(cols = c(6:25), names_to = "Trait")
+
+#group
+by_trait_geno <- by_trait_geno %>% group_by(Trait, Geno.Cluster) %>% summarise(Mean=mean(value)) #find means
+
+#pivot_wider
+by_trait_geno <- by_trait_geno %>% pivot_wider(names_from = Geno.Cluster, values_from = Mean)
+
+by_trait_geno[,-1] <- round(by_trait_geno[,-1], 2) #round off to 2 decimal places
+
+#find sums
+
+
+#Combine the datasets 
+#country
+by_country <- bind_cols(by_country_pheno, by_country_geno[,2:3])
+names(by_country) <- c("Grouping", "1", "2","4","5")
+
+by_trait <- bind_cols(by_trait_pheno,by_trait_geno[,2:3] )
+names(by_trait) <- c("Grouping", "1", "2", "4","5")
+
+
+#bind
+table4 <- bind_rows(by_country, by_trait)
+
+write.csv(table4, "./tables/table4_day18_summaries_by_clusters.csv", row.names = F)
+##edit the file in excel
+```

@@ -1,0 +1,197 @@
+---
+title: "fig6c"
+author: "chiteri"
+date: "7/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+
+
+```{r}
+#initiate libraries
+library(stats)
+library(ggplot2)
+library(tidyverse)
+library(colorspace)
+
+```
+
+```{r}
+#read data
+#bring in SNP Data
+GWAS_GD1 <- read.table("./data/snp/PI498_nmis0.15_maf.01_GD.txt", header = T)
+#head(GWAS_GD)
+
+blups <- read.csv("./blups/blups_combined.csv")
+#filter separate days
+day12 <- blups %>%  filter(Day == 12)
+day15 <- blups %>%  filter(Day == 15)
+day18 <- blups %>%  filter(Day == 18)
+```
+
+####### day 18 #################
+```{r}
+#filter 
+
+GWAS_GD <- GWAS_GD1 %>% filter(PI %in% day18$PI)
+GD <- GWAS_GD[,2:ncol(GWAS_GD)]
+
+#Convert GD into matrix form 
+geno = as.matrix(GD)
+#geno[1:10,1:10]
+
+#bestideotypes
+bestideotypes <- read.csv("./tables/iroot_ranks/Day18_ideotypes_combined.csv")
+
+best <- bestideotypes %>% filter(PI %in% GWAS_GD$PI) %>% arrange(PI)
+
+```
+
+```{r}
+################################################################################           
+######################   PCA of Genotypic Information  #########################
+################################################################################       
+
+# PCA with function prcomp
+geno1 <- geno[ , which(apply(geno, 2, var) != 0)]#remove columns with zero variance
+pca1 <- prcomp(geno1, scale. = TRUE) #Performs a principal components analysis on the given data matrix and returns the results as an object of class prcomp
+#summary(pca1)
+
+# loadings
+pca1_loading = as.data.frame(pca1$x) #the value of the rotated data (the centred data multiplied by the rotation matrix) 
+
+
+#####################################################################################
+#percent variance explained
+#summary(pca1)
+#####################################################################################
+pca1 <- as.data.frame(pca1$x)
+
+#Bind metadata with PCA data for plotting
+pca1_data <- cbind(best$DTRanked, pca1_loading)
+
+
+#pca1_data[,c(1:2,41:42)]
+
+
+PCA <- as.matrix(pca1)
+
+
+```
+
+```{r}
+
+# make figure colored by drought ranking tolerance
+tiff("./figures/fig6_pca/day18_PCA_Drought_tolerant_3b.tiff",compression = "lzw", width = 6, height = 5, units = 'in', res = 500)
+
+ggplot(pca1_loading, aes(x = PC1, y = PC2, color = best$DTRanked)) +
+  geom_point(alpha=0.99,size=2.75) +
+  labs(x = c(pca1_loading$sdev[1],"PC1 (7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Best")+
+  labs(color=expression(atop('Drought Tolerance', 'Rank (n = 368)'))) +
+  theme_classic()+
+  labs(color=expression(atop('Steep, cheap, Deep', 'iRoot Rank'))) +
+  scale_color_gradient2(midpoint=183.5, low="green", mid="blue",high="black", space ="Lab" )+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+dev.off()
+
+# make figure colored by topsoil foraging
+tiff("./figures/fig6_pca/day18_PCA_foraging_3b.tiff",compression = "lzw", width = 6, height = 5, units = 'in', res = 500)
+
+ggplot(pca1_loading, aes(x = PC1, y = PC2, color = best$ScavengerRanked)) +
+  geom_point(alpha=0.99,size=2.75) +
+  labs(x = c(pca1_loading$sdev[1],"PC1 (7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Best")+
+  labs(color=expression(atop('Drought Tolerance', 'Rank (n = 368)'))) +
+  theme_classic()+
+  labs(color=expression(atop('Topsoil foraging', 'iRoot Rank'))) +
+  scale_color_gradient2(midpoint=183.5, low="green", mid="blue",high="black", space ="Lab" )+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+dev.off()
+#find where all the other countries are and look at their climatic conditions
+```
+
+############ end #################
+
+
+####### day 15 #################
+```{r}
+#filter 
+
+GWAS_GD <- GWAS_GD1 %>% filter(PI %in% day15$PI)
+GD <- GWAS_GD[,2:ncol(GWAS_GD)]
+
+#Convert GD into matrix form 
+geno = as.matrix(GD)
+#geno[1:10,1:10]
+
+#bestideotypes
+bestideotypes <- read.csv("./tables/iroot_ranks/Day15_ideotypes_combined.csv")
+
+best <- bestideotypes %>% filter(PI %in% GWAS_GD$PI) %>% arrange(PI)
+
+```
+
+```{r}
+################################################################################           
+######################   PCA of Genotypic Information  #########################
+################################################################################       
+
+# PCA with function prcomp
+geno1 <- geno[ , which(apply(geno, 2, var) != 0)]#remove columns with zero variance
+pca1 <- prcomp(geno1, scale. = TRUE) #Performs a principal components analysis on the given data matrix and returns the results as an object of class prcomp
+#summary(pca1)
+
+# loadings
+pca1_loading = as.data.frame(pca1$x) #the value of the rotated data (the centred data multiplied by the rotation matrix) 
+
+
+#####################################################################################
+#percent variance explained
+#summary(pca1)
+#####################################################################################
+pca1 <- as.data.frame(pca1$x)
+
+#Bind metadata with PCA data for plotting
+pca1_data <- cbind(best$DTRanked, pca1_loading)
+
+
+#pca1_data[,c(1:2,41:42)]
+
+
+PCA <- as.matrix(pca1)
+
+
+```
+
+```{r}
+
+# make figure colored by drought ranking tolerance
+tiff("./figures/fig6_pca/day15_PCA_Drought_tolerant_3b.tiff",compression = "lzw", width = 6, height = 5, units = 'in', res = 500)
+
+ggplot(pca1_loading, aes(x = PC1, y = PC2, color = best$DTRanked)) +
+  geom_point(alpha=0.99,size=2.75) +
+  labs(x = c(pca1_loading$sdev[1],"PC1 (7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Best")+
+  labs(color=expression(atop('Drought Tolerance', 'Rank (n = 367)'))) +
+  theme_classic()+
+  labs(color=expression(atop('Steep, cheap, Deep', 'iRoot Rank'))) +
+  scale_color_gradient2(midpoint=153.5, low="green", mid="blue",high="black", space ="Lab" )+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+dev.off()
+
+# make figure colored by topsoil foraging
+tiff("./figures/fig6_pca/day15_PCA_foraging_3b.tiff",compression = "lzw", width = 6, height = 5, units = 'in', res = 500)
+
+ggplot(pca1_loading, aes(x = PC1, y = PC2, color = best$ScavengerRanked)) +
+  geom_point(alpha=0.99,size=2.75) +
+  labs(x = c(pca1_loading$sdev[1],"PC1 (7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Best")+
+  labs(color=expression(atop('Drought Tolerance', 'Rank (n = 367)'))) +
+  theme_classic()+
+  labs(color=expression(atop('Topsoil foraging', 'iRoot Rank'))) +
+  scale_color_gradient2(midpoint=153.5, low="green", mid="blue",high="black", space ="Lab" )+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+dev.off()
+#find where all the other countries are and look at their climatic conditions
+```

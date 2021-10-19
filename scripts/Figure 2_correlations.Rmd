@@ -1,0 +1,98 @@
+---
+title: "Figure 1"
+author: "chiteri"
+date: "7/19/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+
+
+
+```{r}
+#initiate libraries
+library(tidyverse)
+#library(ggpubr)
+library(corrplot)
+library(gplots)
+library(RColorBrewer)
+library(LDheatmap)
+
+
+
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+# install.packages("BiocManager")
+# BiocManager::install("made4", version = "3.13")
+
+#require(made4). If it fails, run above code
+library(made4)
+
+```
+
+
+###############################################################################
+############################# Explore Correlations ############################
+###############################################################################
+
+```{r}
+#read data
+blups <- read.csv("./blups/blups_combined.csv")
+
+#filter separate days and numeric data only
+day12 <- blups %>%  filter(Day == 12) %>%  select(-c(1:4,CMM, ImageFlag,TRL_GR, SDW, RDW, TDW, RSR)) #remove CMM, ImageFlag because they have no variance
+day15 <- blups %>%  filter(Day == 15) %>% select(-c(1:4,VOL,CMB, CPB, SDW, RDW, TDW, RSR)) #seed weight- has question marks. #Seed_size is character
+day18 <- blups %>%  filter(Day == 18) %>% select(-c(1:4, ImageFlag))#seed weight- has question marks. #Seed_size is character
+
+```
+
+```{r}
+#correlations
+
+Day12_corr <- cor(x=day12[,], y = NULL, use = "everything", method = c("pearson"))
+Day15_corr <- cor(x=day15[,], y = NULL, use = "everything", method = c("pearson"))
+Day18_corr <- cor(x=day18[,], y = NULL, use = "everything", method = c("pearson"))
+
+```
+
+
+
+```{r}
+
+tiff("./figures/fig1_correlations/Day15_correlations.tiff", width = 15, height = 14, units = 'in', res = 150)
+#corrplot(Day15_corr,type="lower", order = 'original',mar = c(1, 1, 1, 1))
+#corrplot.mixed(Day15_corr, order = 'hclust',lower.col = "black",addrect = 2,tl.srt=45)
+corrplot(Day15_corr,type="lower", order = 'hclust',hclust.method = 'ward.D')
+dev.off()
+
+```
+
+```{r}
+#extract core traits
+
+#day 15
+day15_few_traits <- blups %>%  filter(Day == 15)%>%  select(TRL,PRL,WID,CVA,LRB,LRA, SOL2,LED,RHZO,TRLUpper,NWA,SurfaceArea,DIA,DEP, TRL_GR)
+
+#calculate correlations
+day15_few_traits_cor <- cor(x=day15_few_traits[,], y = NULL, use = "everything", method = c("pearson"))
+
+#Plot
+tiff("./figures/fig1_correlations/Day15_core_traits.tiff", width = 15, height = 14, units = 'in', res = 150)
+corrplot(day15_few_traits_cor,type="lower", order = 'hclust',hclust.method = 'ward.D')
+dev.off()
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
