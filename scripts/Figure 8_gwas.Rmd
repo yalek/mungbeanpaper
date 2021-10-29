@@ -1,0 +1,83 @@
+---
+title: "fig8"
+author: "chiteri"
+date: "7/22/2021"
+output: html_document
+---
+#The datasets are from tassel
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+
+```
+
+```{r}
+library(tidyverse)
+
+```
+
+#########plotting manhattan using cmPlot
+```{r}
+library(CMplot)
+```
+
+```{r}
+day12_gwas = read.table("./gwas/day12/MLM_statistics.txt", header = TRUE, sep = "\t")
+day15_gwas = read.table("./gwas/day15/MLM_statistics.txt", header = TRUE, sep = "\t")
+day18_gwas = read.table("./gwas/day18/MLM_statistics.txt", header = TRUE, sep = "\t")
+```
+
+###filter traits data with significant snps
+```{r}
+day12_traits <- day12_gwas %>% filter(!is.na(Chr)) %>% filter(Trait == "LRA")
+
+lra <- day12_traits %>% filter(Trait == "LRA") %>% select(Marker, Chr, Pos, p) %>% dplyr::rename(LRA_Day_12 = "p")
+
+day15_traits <- day15_gwas %>% filter(!is.na(Chr)) %>% filter(Trait == "LED")
+
+led15 <- day15_traits %>% filter(Trait == "LED") %>% select(Marker, Chr, Pos, p) %>% dplyr::rename(LED_Day_15 = "p")
+
+day18_traits <- day18_gwas %>% filter(!is.na(Chr)) %>% filter(Trait %in% c("TRL_GR", "LED", "TDW", "VOL"))
+
+vol <- day18_traits %>% filter(Trait == "VOL") %>% select(Marker, Chr, Pos, p) %>% dplyr::rename(VOL = "p")
+
+led <- day18_traits %>% filter(Trait == "LED") %>% select(Marker, Chr, Pos, p) %>% dplyr::rename(LED = "p")
+
+tdw <- day18_traits %>% filter(Trait == "TDW") %>% select(Marker, Chr, Pos, p) %>% dplyr::rename(TDW = "p")
+
+trl_gr <- day18_traits %>% filter(Trait == "TRL_GR") %>% select(Marker, Chr, Pos, p) %>% dplyr::rename(TRL_GR = "p")
+
+```
+
+####merge
+```{r}
+overall <- merge(lra, led15, by=c("Marker", "Chr", "Pos"))
+overall <- merge(overall, vol, by=c("Marker", "Chr", "Pos"))
+overall <- merge(overall, led, by=c("Marker", "Chr", "Pos"))
+overall <- merge(overall, tdw, by=c("Marker", "Chr", "Pos"))
+overall <- merge(overall, trl_gr, by=c("Marker", "Chr", "Pos"))
+
+overall$Chr <- as.factor(overall$Chr)
+```
+
+######for multi tracks############
+```{r}
+Markers <- list(
+  overall$Marker[overall$LRA_Day_12 <1e-5],
+	overall$Marker[overall$LED_Day_15 <1e-5],
+	overall$Marker[overall$LED_Day_18 <1e-5],
+	overall$Marker[overall$VOL_Day_18 <1e-5],
+	overall$Marker[overall$TDW_Day_18 <1e-5],
+	overall$Marker[overall$TRL_GR_Day_18 <1e-5]
+)
+
+CMplot(overall, plot.type="m",multracks=TRUE,threshold=c(1e-5),threshold.lty=c(1,2), 
+        threshold.lwd=c(1,1), threshold.col=c("black","grey"), amplify=TRUE,bin.size=1e6,
+        chr.den.col=c("darkgreen", "yellow", "red"), signal.col=c("red","green","blue"),
+        signal.cex=1, file="jpg",memo="",dpi=300,file.output=TRUE,verbose=TRUE,
+        highlight=Markers, highlight.text=Markers, highlight.text.cex=1, ylab.pos = 2)
+
+
+```
+

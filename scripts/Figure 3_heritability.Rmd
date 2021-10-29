@@ -1,0 +1,40 @@
+---
+title: "Fig3"
+author: "chiteri"
+date: "10/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+
+##Install packages/fire up libraries
+
+```{r}
+
+library(tidyverse)
+```
+
+```{r}
+###create heritability fig at different days for traits we are interested in
+day12_s <- read.csv("./blups/day12_descriptive.csv")
+day15_s <- read.csv("./blups/day15_descriptive.csv")
+day18_s <- read.csv("./blups/day18_descriptive.csv")
+
+good_traits_12 <- day12_s %>%  filter(Trait %in% c("TRL","PRL","WID","CVA","LRB","VOL","LRA", "SOL2","LED","RHZO","TRL_GR","TRLUpper","NWA","SurfaceArea", "DIA", "DEP")) %>% select(Trait, H2.cullis) %>% arrange(H2.cullis) %>% mutate(day = rep(12))
+
+good_traits_15 <- day15_s %>%  filter(Trait %in% c("TRL","PRL","WID","CVA","LRB","VOL","LRA", "SOL2","LED","RHZO","TRL_GR","TRLUpper","NWA","SurfaceArea", "DIA", "DEP")) %>% select(Trait, H2.cullis) %>% arrange(H2.cullis) %>% mutate(day = rep(15))
+
+good_traits_18 <- day18_s %>%  filter(Trait %in% c("TRL","PRL","WID","CVA","LRB","VOL","LRA", "SOL2","LED","RHZO","TRL_GR","TRLUpper","NWA","SurfaceArea", "DIA", "DEP", "SDW","RDW","TDW","RSR")) %>% select(Trait, H2.cullis) %>% arrange(H2.cullis) %>% mutate(day = rep(18))
+
+good_traits <- bind_rows(good_traits_12, good_traits_15, good_traits_18 )
+
+good_traits$day <- as.factor(good_traits$day)
+
+tiff("./figures/heritability/Figure 3_Heritability.tiff", width = 7, height = 5, units = 'in', res = 300)
+ggplot(good_traits, mapping=aes(reorder(x=Trait, H2.cullis),y=H2.cullis, fill=day )) + geom_bar(stat = "identity", position = position_dodge(),width = 0.5)  + ylab("Broad sense heritability (H)") + xlab("Root Trait") + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle=90, hjust=1)) + ylim(0,1)
+dev.off()
+
+``` 

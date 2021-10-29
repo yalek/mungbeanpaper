@@ -17,16 +17,14 @@ STEPS
 #Sample data provided - 1500 raw data points across three time points( days 12, 15, 18)
 
 Blups - run all_blups.Rmd script
-Figure 3 (heritability) - all_blups.Rmd 
+Figure 2 (Correlations) - Figure 2_correlations.Rmd
+Figure 3 (heritability) - Figure 3_heritability.Rmd 
 Table 2 and Table S2 (day 15 and days 12, 18 decriptive) - all_blups.Rmd 
 
-Figure 2 (Correlations) - Figure 2_correlations.Rmd
 Table 3 and Table S3 - iroot_rank_calculations.Rmd
-Figure 5 (Dendograms), Figure S1/Figure S2 - Figure 5.Rmd (You will need access to the SNP data)
-Figure 6A/Figure S3A (PCA) - Figure 6a.Rmd - (You will need access to the SNP data)
-Figure 6B/Figure S3B/Table S4 (PCA/ with genotypic cluster) - You will need access to the SNP data
-Figure 6C/6D/Figure S3C/D (Overlaying ideotype on PCA) - Figure 6c.Rmd - Will need access to the SNP data
-Figure 7  - Figure 5.Rmd
-Figure 8 (manhattan) - Figure 8_tassel_formating
+Figure 5 (Dendograms), FigureS1/Figure S2 - Figure 5_dendogram.Rmd (You will need access to the SNP data)
+Figure 6 (PCA) - Figure 6.Rmd- (You will need access to the SNP data)
+Figure 7 (heatmap) - Figure 7_heatmap.Rmd
+Figure 8 (manhattan) - Figure 8_gwas.Rmd
 Figure 9 (SVEN plot) - runs on SVEN conceptual framework in R.
 Table S5 - SVEN

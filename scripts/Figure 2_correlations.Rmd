@@ -1,5 +1,5 @@
 ---
-title: "Figure 1"
+title: "Figure 2"
 author: "chiteri"
 date: "7/19/2021"
 output: html_document
@@ -61,7 +61,7 @@ Day18_corr <- cor(x=day18[,], y = NULL, use = "everything", method = c("pearson"
 
 ```{r}
 
-tiff("./figures/fig1_correlations/Day15_correlations.tiff", width = 15, height = 14, units = 'in', res = 150)
+tiff("./figures/fig2_correlations/Day15_correlations.tiff", width = 15, height = 14, units = 'in', res = 150)
 #corrplot(Day15_corr,type="lower", order = 'original',mar = c(1, 1, 1, 1))
 #corrplot.mixed(Day15_corr, order = 'hclust',lower.col = "black",addrect = 2,tl.srt=45)
 corrplot(Day15_corr,type="lower", order = 'hclust',hclust.method = 'ward.D')
@@ -79,7 +79,7 @@ day15_few_traits <- blups %>%  filter(Day == 15)%>%  select(TRL,PRL,WID,CVA,LRB,
 day15_few_traits_cor <- cor(x=day15_few_traits[,], y = NULL, use = "everything", method = c("pearson"))
 
 #Plot
-tiff("./figures/fig1_correlations/Day15_core_traits.tiff", width = 15, height = 14, units = 'in', res = 150)
+tiff("./figures/fig2_correlations/Day15_core_traits.tiff", width = 15, height = 14, units = 'in', res = 150)
 corrplot(day15_few_traits_cor,type="lower", order = 'hclust',hclust.method = 'ward.D')
 dev.off()
 

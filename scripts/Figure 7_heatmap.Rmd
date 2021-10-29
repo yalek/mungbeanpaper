@@ -1,0 +1,193 @@
+---
+title: "fig7"
+author: "chiteri"
+date: "8/4/2021"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+
+
+```{r}
+#initiate libraries
+#Parallel computing
+library(snow)
+library(doSNOW)
+library(parallel)
+detectCores()
+cl<-makeCluster(4,type="SOCK")
+registerDoSNOW(cl)
+library(tidyverse)
+library(factoextra)
+library(viridis)
+library(gplots)
+#library(colorpanel)
+library(colorspace)
+```
+
+```{r}
+#read data
+#bring in SNP Data
+GWAS_GD1 <- read.table("./data/snp/PI498_nmis0.15_maf.01_GD.txt", header = T)
+
+#head(GWAS_GD)
+
+blups <- read.csv("./figures/fig5_dendogram/blups_with_clusters.csv")
+
+#filter separate days
+day12 <- blups %>%  filter(Day == 12)
+day15 <- blups %>%  filter(Day == 15)
+day18 <- blups %>%  filter(Day == 18)
+```
+
+############day 15 ###############
+```{r}
+
+ideotypes <- read.csv("./tables/iroot_ranks/Day15_ideotypes_combined.csv")
+
+
+#filter snps with PI available
+GWAS_GD <- GWAS_GD1 %>% filter(PI %in% day15$PI)
+
+#grap P1 from country that are in GWAS_GD
+day15 <- day15 %>% filter(PI %in% GWAS_GD$PI)
+
+#add genotypic cluster to snp data
+GWAS_GD <- cbind(day15$Geno.Cluster,GWAS_GD) 
+names(GWAS_GD)[1] <- "Geno.Cluster"
+GWAS_GD <- GWAS_GD %>% relocate(Geno.Cluster, .after = PI) 
+
+GD <- GWAS_GD[,3:ncol(GWAS_GD)]
+
+#Convert GD into matrix form 
+geno = as.matrix(GD)
+#geno[1:10,1:10]
+```
+
+```{r}
+#############################################################################################################
+#############################   Calculate Genetic Distance and Create Dendrogram ############################
+#############################################################################################################
+#Compute genetic distance using NAM package
+library(NAM)
+gdist1 = Gdist(geno, method = 1) #This function computes measures of genetic distances between populations using a genpop object. 
+
+#Create dendrogram
+library(dendextend)
+#method complete
+
+geno_dend <- as.dendrogram(hclust(gdist1,method='complete'))
+plot(geno_dend)
+
+#Customize dendrogram, set branches to specified width 
+geno_dend <- set(geno_dend, "branches_lwd", 2)
+
+#determine best number of clusters to use
+#fviz_nbclust(geno, FUNcluster = hcut, method = "silhouette")#2 are the best clusters
+
+
+#set branches to specified color
+#cols_branches <-c("yellow2","magenta","red","orange","blue","black","cyan","green3")
+#Customize dendrogram
+geno_dend <- color_branches(geno_dend, k=2, col = c("#009E73", "#CC79A7"), groupLabels = TRUE)
+plot(geno_dend)
+```
+
+```{r}
+#Select the phenotypic data to showcase in the heatmap
+
+Day15_traits <- day15 %>% dplyr::select(PI,TRL,PRL,WID,CVA,LRB,VOL,LRA, SOL2,LED,RHZO,TRLUpper,NWA,SurfaceArea,DIA,DEP)
+
+Day15_ideotypes <- ideotypes %>% dplyr::select(PI,ScavengerRanked, DTRanked)
+
+#confirm same order
+all <- merge(Day15_traits, Day15_ideotypes, ID="PI" )
+
+#extract
+Day15_traits <- all %>% dplyr::select(TRL,PRL,WID,CVA,LRB,VOL,LRA, SOL2,LED,RHZO,TRLUpper,NWA,SurfaceArea,DIA,DEP)
+
+Day15_ideotypes <- all %>% dplyr::select(PI,ScavengerRanked, DTRanked)
+
+#h-clustering for ideotypes
+#Day15_ideotypes <- lapply(Day15_ideotypes, as.numeric) %>% as.data.frame()
+
+Day15_ideotypes_scaled <- scale(as.matrix(Day15_ideotypes[,-1]))
+
+Day15_ideotypes_hc <- hclust(as.dist(1-cor(Day15_ideotypes_scaled, method="spearman")), method="complete")
+
+#H-clustering for traits
+Day15_traits_scaled <- scale(as.matrix(Day15_traits[, -1]))
+
+Day15_traits_hc <- hclust(as.dist(1-cor(Day15_traits_scaled, method="spearman")), method="complete")
+
+#combine ideotypes and traits scaled data
+Day15_scaled <- cbind(Day15_ideotypes_scaled,Day15_traits_scaled)
+
+#h-clustering for combinations with and without transpose
+
+hr <- hclust(as.dist(1-cor(t(Day15_scaled), method="pearson")), method="complete")
+
+hc <- hclust(as.dist(1-cor(Day15_scaled, method="spearman")), method="complete")
+
+###
+#find number of clusters
+fviz_nbclust(Day15_ideotypes_scaled, FUNcluster = hcut, method = "silhouette")#2 are the best clusters
+fviz_nbclust(Day15_traits_scaled, FUNcluster = hcut, method = "silhouette")#2
+
+#### dendogram ##
+traits_dendo <- as.dendrogram(Day15_traits_hc)
+traits_dendo <- color_branches(traits_dendo, k=2, col = c("#0072B2", "#D55E00" ), groupLabels = TRUE)
+plot(traits_dendo)
+
+#find color
+ideotypes_palette <- colorRampPalette(c("green", "black", "red"))(n = 367)
+
+tiff("./figures/fig7_heatmap/Day15_heatmap_iRoot.tiff",compression = "lzw", width = 5.5, height = 15, units = 'in', res = 300)
+heatmap.2(x=Day15_ideotypes_scaled, Rowv=geno_dend, Colv=as.dendrogram(Day15_ideotypes_hc), col=ideotypes_palette, scale="none", density.info="none", 
+          trace="none",margins=c(10,2), cexRow = 0.3, cexCol = 1.6, labRow = "",
+          keysize = 1, main = "Day 15 iRoot type rank", ylab = "Genotypic clusters")
+dev.off()
+
+
+###traits
+##find color
+traits_palette <- colorRampPalette(c("orange","white", "darkblue"))(n = 367)
+
+tiff("./figures/fig7_heatmap/Day15_heatmap_13Traits.tiff",compression = "lzw", width = 13, height = 15, units = 'in', res = 300)
+heatmap.2(x=Day15_traits_scaled, Rowv=geno_dend, Colv=traits_dendo, col=traits_palette, scale="none", density.info="none", 
+          trace="none",margins=c(10,2), cexRow = 0.3, cexCol = 1.6, labRow = NA,
+          keysize = 1, main = "Day 15 Root trait performance")
+dev.off()
+```
+
+```{r}
+##########complex hit map###############
+
+#library(devtools)
+library(ComplexHeatmap)
+
+
+ht1 <- Heatmap(Day15_traits_scaled, name = "Root trait", col = traits_palette ,
+        cluster_rows = geno_dend,
+        cluster_columns = traits_dendo,
+        cluster_column_slices = TRUE,
+        column_title = "Root trait performance")
+
+ht2 <- Heatmap(Day15_ideotypes_scaled, name = "iRoot", col=ideotypes_palette,
+        cluster_rows = geno_dend,
+        row_title = "Genotypic cluster",
+        cluster_columns = as.dendrogram(Day15_ideotypes_hc),
+        column_title = "iRoot type rank")
+
+#jpeg("./figures/fig5_line_graphs/Day15_combined_heatmap.jpg")
+tiff("./figures/fig7_heatmap/Day15_combined_heatmap.tiff",compression = "lzw", width = 7, height = 5, units = 'in', res = 300)
+ht2 + ht1
+dev.off()
+
+```
+
+##########end day 15 #############

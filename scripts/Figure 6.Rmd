@@ -1,0 +1,304 @@
+---
+title: "Fig6"
+author: "chiteri"
+date: "10/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+
+
+```{r}
+#initiate libraries
+library(stats)
+library(ggplot2)
+library(tidyverse)
+library(colorspace)
+library(cowplot) 
+
+```
+
+```{r}
+#read data
+#bring in SNP Data
+GWAS_GD1 <- read.table("./data/snp/PI498_nmis0.15_maf.01_GD.txt", header = T)
+#head(GWAS_GD)
+
+blups <- read.csv("./figures/fig5_dendogram/blups_with_clusters.csv")
+
+#filter separate days
+day12 <- blups %>%  filter(Day == 12)
+day15 <- blups %>%  filter(Day == 15)
+day18 <- blups %>%  filter(Day == 18)
+```
+
+############day 15 ####################
+
+```{r}
+day15_2 <- day15
+#unique(day15_2$Country)
+#filter snps with PI available
+GWAS_GD <- GWAS_GD1 %>% filter(PI %in% day15_2$PI)
+
+#grap P1 from country that are in GWAS_GD
+day15_2 <- day15_2 %>% filter(PI %in% GWAS_GD$PI)
+
+#add country to snp data
+GWAS_GD <- cbind(day15_2$Country,day15_2$Geno.Cluster,GWAS_GD) 
+names(GWAS_GD)[1] <- "Country"
+names(GWAS_GD)[2] <- "Geno.Cluster"
+GWAS_GD <- GWAS_GD %>% relocate(PI, .before = Country)
+
+###ranking
+#bestideotypes--day15
+bestideotypes <- read.csv("./tables/iroot_ranks/Day15_ideotypes_combined.csv")
+best <- bestideotypes %>% filter(PI %in% GWAS_GD$PI)
+
+##bind them to GWAS_GD
+GWAS_GD <- merge(best[-2],GWAS_GD, by=c("PI"))
+
+GD <- GWAS_GD[,6:ncol(GWAS_GD)] #numerical columns
+
+#Convert GD into matrix form 
+geno = as.matrix(GD)
+#geno[1:10,1:10]
+
+```
+
+```{r}
+###############################################################################           
+######################   PCA of Genotypic Information  #########################
+################################################################################       
+
+# PCA with function prcomp
+
+geno1 <- geno[ , which(apply(geno, 2, var) != 0)]#remove columns with zero variance
+pca1 <- prcomp(geno1, scale. = TRUE) #Performs a principal components analysis on the given data matrix and returns the results as an object of class prcomp
+#summary(pca1)
+
+# loadings
+pca1_loading =as.data.frame(pca1$x) #the value of the rotated data (the centred data multiplied by the rotation matrix) 
+
+#####################################################################################
+#percent variance explained
+#summary(pca1_loading)
+#####################################################################################
+pca1 <- as.data.frame(pca1$x)
+
+```
+
+```{r}
+#bind metadata
+pca1_data <- cbind(GWAS_GD[1:5], pca1_loading) 
+```
+
+```{r}
+# make figure colored by country of origin
+cbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+#PCA graph
+p1 <- ggplot(pca1_data, aes(x = PC1,y = PC2, color = factor(Country))) +
+  geom_point(alpha=0.99,size=2.5) + 
+  scale_color_manual(values = cbPalette) +
+  labs( x = c(pca1_loading$sdev[1],""),y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Country")+
+  theme_classic()+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+
+```
+
+###b
+##clustering
+```{r}
+#PCA with clusters
+p2 <- ggplot(pca1_data, aes(x = PC1, y = PC2,color = as.factor(Geno.Cluster))) +
+  geom_point(alpha=0.99,size=2) +
+  stat_ellipse(type = "norm", level = 0.90, linetype = 1, lwd = 1)+
+  labs(color=expression(atop('Genotypic', 'Cluster'))) +
+  theme_classic()+
+  labs(x = c(pca1_loading$sdev[1],""), y = c(pca1_loading$sdev[2], ""))+
+  scale_color_manual(values=c("#E69F00","#0072B2")) +
+  theme(axis.text=element_text(size=12),axis.title=element_text(size=14,face="bold"))
+
+#PC1 7.6 %)
+#PC2 (3.9 %)
+#labs(x = c(pca1_loading$sdev[1],"PC1 7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"))+
+```
+
+```{r}
+# make figure colored by drought ranking tolerance
+
+p3 <- ggplot(pca1_data, aes(x = PC1, y = PC2, color = DTRanked)) +
+  geom_point(alpha=0.99,size=2.75) +
+  labs(x = c(pca1_loading$sdev[1],"PC1 (7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Best")+
+  labs(color=expression(atop('Drought Tolerance', 'Rank (n = 367)'))) +
+  theme_classic()+
+  labs(color=expression(atop('Steep, cheap, Deep', 'iRoot Rank'))) +
+  scale_color_gradient2(midpoint=153.5, low="green", mid="blue",high="black", space ="Lab" )+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+
+
+
+#find where all the other countries are and look at their climatic conditions
+```
+
+```{r}
+# make figure colored by topsoil foraging
+
+p4 <- ggplot(pca1_data, aes(x = PC1, y=PC2,  color = ScavengerRanked)) +
+  geom_point(alpha=0.99,size=2.75) +
+  labs(x = c(pca1_loading$sdev[1],"PC1 (7.6 %)"), y = c(pca1_loading$sdev[2], ""), color="Best")+
+  labs(color=expression(atop('Drought Tolerance', 'Rank (n = 367)'))) +
+  theme_classic()+
+  labs(color=expression(atop('Topsoil foraging', 'iRoot Rank'))) +
+  scale_color_gradient2(midpoint=153.5, low="green", mid="blue",high="black", space ="Lab" )+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+
+#PC2 (3.9 %)
+#y = PC2,
+#, y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Best"
+```
+
+```{r}
+
+
+tiff("./figures/fig3_pca/Figure 6_pca.tiff",compression = "lzw", width = 10, height = 7, units = 'in', res = 300)
+plot_grid(p1,p2,p3,p4, labels = c("A", "B", "C", "D"))
+dev.off()
+```
+
+#########day 18############
+
+```{r}
+day18_2 <- day18
+#unique(day15_2$Country)
+#filter snps with PI available
+GWAS_GD <- GWAS_GD1 %>% filter(PI %in% day18_2$PI)
+
+#grap P1 from country that are in GWAS_GD
+day18_2 <- day18_2 %>% filter(PI %in% GWAS_GD$PI)
+
+#add country to snp data
+GWAS_GD <- cbind(day18_2$Country,day18_2$Geno.Cluster,GWAS_GD) 
+names(GWAS_GD)[1] <- "Country"
+names(GWAS_GD)[2] <- "Geno.Cluster"
+GWAS_GD <- GWAS_GD %>% relocate(PI, .before = Country)
+
+###ranking
+#bestideotypes--day15
+bestideotypes <- read.csv("./tables/iroot_ranks/Day18_ideotypes_combined.csv")
+best <- bestideotypes %>% filter(PI %in% GWAS_GD$PI)
+
+##bind them to GWAS_GD
+GWAS_GD <- merge(best[-2],GWAS_GD, by=c("PI"))
+
+GD <- GWAS_GD[,6:ncol(GWAS_GD)] #numerical columns
+
+#Convert GD into matrix form 
+geno = as.matrix(GD)
+#geno[1:10,1:10]
+
+```
+
+```{r}
+###############################################################################           
+######################   PCA of Genotypic Information  #########################
+################################################################################       
+
+# PCA with function prcomp
+
+geno1 <- geno[ , which(apply(geno, 2, var) != 0)]#remove columns with zero variance
+pca1 <- prcomp(geno1, scale. = TRUE) #Performs a principal components analysis on the given data matrix and returns the results as an object of class prcomp
+#summary(pca1)
+
+# loadings
+pca1_loading =as.data.frame(pca1$x) #the value of the rotated data (the centred data multiplied by the rotation matrix) 
+
+#####################################################################################
+#percent variance explained
+#summary(pca1_loading)
+#####################################################################################
+pca1 <- as.data.frame(pca1$x)
+
+```
+
+```{r}
+#bind metadata
+pca1_data <- cbind(GWAS_GD[1:5], pca1_loading) 
+```
+
+```{r}
+# make figure colored by country of origin
+cbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+#PCA graph
+p1 <- ggplot(pca1_data, aes(x = PC1,y = PC2, color = factor(Country))) +
+  geom_point(alpha=0.99,size=2.5) + 
+  scale_color_manual(values = cbPalette) +
+  labs( x = c(pca1_loading$sdev[1],""),y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Country")+
+  theme_classic()+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+
+```
+
+###b
+##clustering
+```{r}
+#PCA with clusters
+p2 <- ggplot(pca1_data, aes(x = PC1, y = PC2,color = as.factor(Geno.Cluster))) +
+  geom_point(alpha=0.99,size=2) +
+  stat_ellipse(type = "norm", level = 0.90, linetype = 1, lwd = 1)+
+  labs(color=expression(atop('Genotypic', 'Cluster'))) +
+  theme_classic()+
+  labs(x = c(pca1_loading$sdev[1],""), y = c(pca1_loading$sdev[2], ""))+
+  scale_color_manual(values=c("#E69F00","#0072B2")) +
+  theme(axis.text=element_text(size=12),axis.title=element_text(size=14,face="bold"))
+
+#PC1 7.6 %)
+#PC2 (3.9 %)
+#labs(x = c(pca1_loading$sdev[1],"PC1 7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"))+
+```
+
+```{r}
+# make figure colored by drought ranking tolerance
+
+p3 <- ggplot(pca1_data, aes(x = PC1, y = PC2, color = DTRanked)) +
+  geom_point(alpha=0.99,size=2.75) +
+  labs(x = c(pca1_loading$sdev[1],"PC1 (7.6 %)"), y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Best")+
+  labs(color=expression(atop('Drought Tolerance', 'Rank (n = 367)'))) +
+  theme_classic()+
+  labs(color=expression(atop('Steep, cheap, Deep', 'iRoot Rank'))) +
+  scale_color_gradient2(midpoint=153.5, low="green", mid="blue",high="black", space ="Lab" )+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+
+
+
+#find where all the other countries are and look at their climatic conditions
+```
+
+```{r}
+# make figure colored by topsoil foraging
+
+p4 <- ggplot(pca1_data, aes(x = PC1, y=PC2,  color = ScavengerRanked)) +
+  geom_point(alpha=0.99,size=2.75) +
+  labs(x = c(pca1_loading$sdev[1],"PC1 (7.6 %)"), y = c(pca1_loading$sdev[2], ""), color="Best")+
+  labs(color=expression(atop('Drought Tolerance', 'Rank (n = 367)'))) +
+  theme_classic()+
+  labs(color=expression(atop('Topsoil foraging', 'iRoot Rank'))) +
+  scale_color_gradient2(midpoint=153.5, low="green", mid="blue",high="black", space ="Lab" )+
+  theme(axis.text=element_text(size=12,face="bold"),axis.title=element_text(size=14,face="bold"))
+
+#PC2 (3.9 %)
+#y = PC2,
+#, y = c(pca1_loading$sdev[2], "PC2 (3.9 %)"), color="Best"
+```
+
+```{r}
+
+
+tiff("./figures/fig3_pca/Figure 6_pca_day18.tiff",compression = "lzw", width = 10, height = 7, units = 'in', res = 300)
+plot_grid(p1,p2,p3,p4, labels = c("A", "B", "C", "D"))
+dev.off()
+```
